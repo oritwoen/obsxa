@@ -69,23 +69,27 @@ export function restoreDatabase(dbPath: string, fromBasePath: string): RestoreRe
   if (!existsSync(sourceFiles[0]!)) {
     throw new Error(`Backup source not found: ${fromBasePath}`);
   }
+  const targetFiles = companionPaths(target);
 
   let preRestoreBackup: string | null = null;
-  if (existsSync(target)) {
+  if (targetFiles.some((f) => f && existsSync(f))) {
     const safety = `${target}.pre-restore.bak.${new Date().toISOString().replace(/[:.]/g, "-")}`;
     backupDatabase(target, safety);
     preRestoreBackup = safety;
   }
 
-  const targetFiles = companionPaths(target);
   const staged: { tmp: string; final: string }[] = [];
+  const staleTargets: string[] = [];
 
   try {
     for (let i = 0; i < sourceFiles.length; i += 1) {
       const sourceFile = sourceFiles[i];
       const targetFile = targetFiles[i];
       if (!sourceFile || !targetFile) continue;
-      if (!existsSync(sourceFile)) continue;
+      if (!existsSync(sourceFile)) {
+        if (existsSync(targetFile)) staleTargets.push(targetFile);
+        continue;
+      }
       const tmpFile = `${targetFile}.restoring`;
       ensureParentDir(tmpFile);
       copyFileSync(sourceFile, tmpFile);
@@ -108,6 +112,12 @@ export function restoreDatabase(dbPath: string, fromBasePath: string): RestoreRe
   for (const { tmp, final } of staged) {
     renameSync(tmp, final);
     restored.push(final);
+  }
+
+  for (const stale of staleTargets) {
+    try {
+      unlinkSync(stale);
+    } catch {}
   }
 
   return {

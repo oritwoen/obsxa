@@ -19,9 +19,13 @@ import type {
 
 function parseDate(value: Date | string | null | undefined): Date | null {
   if (value === null || value === undefined) return null;
-  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) throw new Error(`Invalid date: ${value}`);
+    return value;
+  }
   const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
+  if (Number.isNaN(parsed.getTime())) throw new Error(`Invalid date string: "${value}"`);
+  return parsed;
 }
 
 function toTransition(row: typeof observationStatusEvents.$inferSelect): ObservationTransition {
@@ -89,6 +93,9 @@ export function createObservationStore(db: ObsxaDB) {
 
     addMany(records: ObservationImportRecord[]): Observation[] {
       return records.map((record) => {
+        if (record.status === "promoted" && !record.promotedTo) {
+          throw new Error("Imported promoted observations must include promotedTo");
+        }
         const created = this.add(record);
         if (record.status === "dismissed") {
           return this.dismiss(created.id, {
@@ -103,10 +110,7 @@ export function createObservationStore(db: ObsxaDB) {
           });
         }
         if (record.status === "promoted") {
-          if (!record.promotedTo) {
-            throw new Error("Imported promoted observations must include promotedTo");
-          }
-          return this.promote(created.id, record.promotedTo);
+          return this.promote(created.id, record.promotedTo!);
         }
         return created;
       });

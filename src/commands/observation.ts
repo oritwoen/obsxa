@@ -28,7 +28,6 @@ const reasonCodes: ObservationStatusReasonCode[] = [
   "irrelevant",
   "invalid",
   "manual_review",
-  "promoted",
 ];
 
 function parseTags(tags?: string): string[] | undefined {
@@ -39,10 +38,13 @@ function parseTags(tags?: string): string[] | undefined {
     .filter(Boolean);
 }
 
-function parseOptionalInt(value?: string): number | undefined {
+function parseOptionalInt(value?: string, name = "value"): number | undefined {
   if (!value) return undefined;
-  const parsed = Number.parseInt(value, 10);
-  return Number.isNaN(parsed) ? undefined : parsed;
+  if (!/^\d+$/.test(value)) {
+    consola.error(`--${name} must be an integer, got "${value}"`);
+    process.exit(1);
+  }
+  return Number(value);
 }
 
 function readDataFile<T>(filePath: string): T {
@@ -114,7 +116,7 @@ export default defineCommand({
                 type: args.type as ObservationType | undefined,
                 source: args.source,
                 sourceType: args["source-type"] as SourceType | undefined,
-                confidence: parseOptionalInt(args.confidence),
+                confidence: parseOptionalInt(args.confidence, "confidence"),
                 tags: parseTags(args.tags),
                 data: args.data,
                 context: args.context,
@@ -122,9 +124,9 @@ export default defineCommand({
                 sourceRef: args["source-ref"],
                 collector: args.collector,
                 inputHash: args["input-hash"],
-                evidenceStrength: parseOptionalInt(args.evidence),
-                novelty: parseOptionalInt(args.novelty),
-                uncertainty: parseOptionalInt(args.uncertainty),
+                evidenceStrength: parseOptionalInt(args.evidence, "evidence"),
+                novelty: parseOptionalInt(args.novelty, "novelty"),
+                uncertainty: parseOptionalInt(args.uncertainty, "uncertainty"),
                 reproducibilityHint: args.reproducibility,
               });
               if (args.toon || args.json) return output(observation, args.toon);
@@ -402,7 +404,7 @@ export default defineCommand({
                 type: args.type as ObservationType | undefined,
                 source: args.source,
                 sourceType: args["source-type"] as SourceType | undefined,
-                confidence: parseOptionalInt(args.confidence),
+                confidence: parseOptionalInt(args.confidence, "confidence"),
                 tags: parseTags(args.tags),
                 data: args.data,
                 context: args.context,
@@ -410,9 +412,9 @@ export default defineCommand({
                 sourceRef: args["source-ref"],
                 collector: args.collector,
                 inputHash: args["input-hash"],
-                evidenceStrength: parseOptionalInt(args.evidence),
-                novelty: parseOptionalInt(args.novelty),
-                uncertainty: parseOptionalInt(args.uncertainty),
+                evidenceStrength: parseOptionalInt(args.evidence, "evidence"),
+                novelty: parseOptionalInt(args.novelty, "novelty"),
+                uncertainty: parseOptionalInt(args.uncertainty, "uncertainty"),
                 reproducibilityHint: args.reproducibility,
               });
               if (args.toon || args.json) return output(result, args.toon);

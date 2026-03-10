@@ -401,6 +401,56 @@ export function createDedupStore(db: ObsxaDB) {
           })
           .run();
 
+        const primaryFromRelations = tx
+          .select({
+            to: observationRelations.toObservationId,
+            type: observationRelations.type,
+          })
+          .from(observationRelations)
+          .where(eq(observationRelations.fromObservationId, primaryObservationId))
+          .all();
+        const primaryToRelations = tx
+          .select({
+            from: observationRelations.fromObservationId,
+            type: observationRelations.type,
+          })
+          .from(observationRelations)
+          .where(eq(observationRelations.toObservationId, primaryObservationId))
+          .all();
+
+        const primaryFromKeys = new Set(primaryFromRelations.map((r) => `${r.to}:${r.type}`));
+        const primaryToKeys = new Set(primaryToRelations.map((r) => `${r.from}:${r.type}`));
+
+        const duplicateFromRelations = tx
+          .select({
+            id: observationRelations.id,
+            to: observationRelations.toObservationId,
+            type: observationRelations.type,
+          })
+          .from(observationRelations)
+          .where(eq(observationRelations.fromObservationId, duplicateObservationId))
+          .all();
+        const duplicateToRelations = tx
+          .select({
+            id: observationRelations.id,
+            from: observationRelations.fromObservationId,
+            type: observationRelations.type,
+          })
+          .from(observationRelations)
+          .where(eq(observationRelations.toObservationId, duplicateObservationId))
+          .all();
+
+        for (const rel of duplicateFromRelations) {
+          if (primaryFromKeys.has(`${rel.to}:${rel.type}`)) {
+            tx.delete(observationRelations).where(eq(observationRelations.id, rel.id)).run();
+          }
+        }
+        for (const rel of duplicateToRelations) {
+          if (primaryToKeys.has(`${rel.from}:${rel.type}`)) {
+            tx.delete(observationRelations).where(eq(observationRelations.id, rel.id)).run();
+          }
+        }
+
         tx.update(observationRelations)
           .set({ fromObservationId: primaryObservationId })
           .where(eq(observationRelations.fromObservationId, duplicateObservationId))
