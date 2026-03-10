@@ -147,7 +147,5 @@ export const clusterMembers = sqliteTable(
       .notNull()
       .$defaultFn(() => new Date()),
   },
-  (table) => [
-    uniqueIndex("idx_cluster_members_pair").on(table.clusterId, table.observationId),
-  ],
+  (table) => [uniqueIndex("idx_cluster_members_pair").on(table.clusterId, table.observationId)],
 );

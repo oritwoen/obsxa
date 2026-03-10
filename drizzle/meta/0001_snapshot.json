@@ -39,10 +39,7 @@
       "indexes": {
         "idx_cluster_members_pair": {
           "name": "idx_cluster_members_pair",
-          "columns": [
-            "cluster_id",
-            "observation_id"
-          ],
+          "columns": ["cluster_id", "observation_id"],
           "isUnique": true
         }
       },
@@ -397,11 +394,7 @@
       "indexes": {
         "idx_observation_relations_triple": {
           "name": "idx_observation_relations_triple",
-          "columns": [
-            "from_observation_id",
-            "to_observation_id",
-            "type"
-          ],
+          "columns": ["from_observation_id", "to_observation_id", "type"],
           "isUnique": true
         }
       },
