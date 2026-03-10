@@ -1,0 +1,242 @@
+import { existsSync, mkdirSync, statSync } from 'node:fs'
+import { basename, dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import Database from 'better-sqlite3'
+import { drizzle } from 'drizzle-orm/better-sqlite3'
+import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
+import { createAnalysisStore } from './core/analysis.ts'
+import { createClusterStore } from './core/cluster.ts'
+import { createDedupStore } from './core/dedup.ts'
+import { createObservationStore } from './core/observation.ts'
+import { createProjectStore } from './core/project.ts'
+import { createRelationStore } from './core/relation.ts'
+import { createSearchStore } from './core/search.ts'
+import { backupDatabase } from './backup.ts'
+import type { ObsxaOptions } from './types.ts'
+
+const SCHEMA_VERSION = 1
+
+export type {
+  AddCluster,
+  AddObservation,
+  AddRelation,
+  CandidateReviewResult,
+  Cluster,
+  ClusterMember,
+  CreateProject,
+  DuplicateCandidate,
+  DuplicateCandidateEvent,
+  DuplicateCandidateStatus,
+  MergeResult,
+  Observation,
+  ObservationBatchUpdateRecord,
+  ObservationEdit,
+  ObservationImportRecord,
+  ObservationMerge,
+  ObservationRelation,
+  ObservationRelationType,
+  ObservationStatusReasonCode,
+  ObservationTransition,
+  ObservationStatus,
+  ObservationType,
+  ObsxaOptions,
+  Project,
+  ProjectStats,
+  ScanDuplicatesResult,
+  SearchResult,
+  SourceType,
+  TriageRow,
+  TriageSort,
+  TransitionObservation,
+  UpdateObservation,
+} from './types.ts'
+
+function findMigrationsFolder(): string {
+  const start = dirname(fileURLToPath(import.meta.url))
+  let current = start
+
+  for (;;) {
+    const candidate = resolve(current, 'drizzle')
+    if (existsSync(resolve(candidate, 'meta/_journal.json'))) return candidate
+
+    const parent = dirname(current)
+    if (parent === current) break
+    current = parent
+  }
+
+  throw new Error('Cannot find drizzle migrations folder')
+}
+
+function currentVersionValue(): string {
+  return String(SCHEMA_VERSION)
+}
+
+function ensureMetaTable(sqlite: Database.Database): void {
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS obsxa_meta (
+      key TEXT PRIMARY KEY NOT NULL,
+      value TEXT NOT NULL,
+      updated_at INTEGER NOT NULL
+    )
+  `)
+}
+
+function getSchemaVersion(sqlite: Database.Database): number | null {
+  const row = sqlite.prepare('SELECT value FROM obsxa_meta WHERE key = ?').get('schema_version') as { value?: string } | undefined
+  if (!row?.value) return null
+  const parsed = Number.parseInt(row.value, 10)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function setSchemaVersion(sqlite: Database.Database, version: number): void {
+  sqlite.prepare(
+    `INSERT INTO obsxa_meta (key, value, updated_at)
+     VALUES (?, ?, strftime('%s', 'now'))
+     ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`,
+  ).run('schema_version', String(version))
+}
+
+function shouldBackup(dbPath: string, autoBackup: boolean): boolean {
+  if (!autoBackup) return false
+  if (dbPath === ':memory:') return false
+  if (!existsSync(dbPath)) return false
+  try {
+    return statSync(dbPath).size > 0
+  } catch {
+    return false
+  }
+}
+
+function makeBackupPath(dbPath: string, backupDir?: string): string {
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+  const fileName = `${basename(dbPath)}.bak.${stamp}`
+  if (backupDir) {
+    mkdirSync(backupDir, { recursive: true })
+    return join(backupDir, fileName)
+  }
+  return `${dbPath}.bak.${stamp}`
+}
+
+const CUSTOM_SQL = `
+CREATE INDEX IF NOT EXISTS idx_observations_project ON observations(project_id);
+CREATE INDEX IF NOT EXISTS idx_observations_status ON observations(status);
+CREATE INDEX IF NOT EXISTS idx_observations_type ON observations(type);
+CREATE INDEX IF NOT EXISTS idx_observations_source_type ON observations(source_type);
+CREATE INDEX IF NOT EXISTS idx_observations_triage ON observations(triage_score);
+CREATE INDEX IF NOT EXISTS idx_rel_from ON observation_relations(from_observation_id);
+CREATE INDEX IF NOT EXISTS idx_rel_to ON observation_relations(to_observation_id);
+CREATE INDEX IF NOT EXISTS idx_rel_type ON observation_relations(type);
+CREATE INDEX IF NOT EXISTS idx_observation_status_events_observation ON observation_status_events(observation_id);
+CREATE INDEX IF NOT EXISTS idx_clusters_project ON clusters(project_id);
+CREATE INDEX IF NOT EXISTS idx_cluster_members_cluster ON cluster_members(cluster_id);
+CREATE INDEX IF NOT EXISTS idx_cluster_members_observation ON cluster_members(observation_id);
+CREATE INDEX IF NOT EXISTS idx_duplicate_candidates_project ON duplicate_candidates(project_id);
+CREATE INDEX IF NOT EXISTS idx_duplicate_candidates_status ON duplicate_candidates(status);
+CREATE INDEX IF NOT EXISTS idx_duplicate_candidate_events_candidate ON duplicate_candidate_events(candidate_id);
+CREATE INDEX IF NOT EXISTS idx_observation_merges_project ON observation_merges(project_id);
+CREATE INDEX IF NOT EXISTS idx_observation_edits_observation ON observation_edits(observation_id);
+`
+
+
+const FTS_SQL = `
+CREATE VIRTUAL TABLE IF NOT EXISTS observations_fts USING fts5(
+  title,
+  description,
+  tags,
+  content='observations',
+  content_rowid='id'
+);
+
+CREATE TRIGGER IF NOT EXISTS observations_fts_ai AFTER INSERT ON observations BEGIN
+  INSERT INTO observations_fts(rowid, title, description, tags)
+  VALUES (NEW.id, NEW.title, NEW.description, NEW.tags);
+END;
+
+CREATE TRIGGER IF NOT EXISTS observations_fts_ad AFTER DELETE ON observations BEGIN
+  INSERT INTO observations_fts(observations_fts, rowid, title, description, tags)
+  VALUES('delete', OLD.id, OLD.title, OLD.description, OLD.tags);
+END;
+
+CREATE TRIGGER IF NOT EXISTS observations_fts_au AFTER UPDATE ON observations BEGIN
+  INSERT INTO observations_fts(observations_fts, rowid, title, description, tags)
+  VALUES('delete', OLD.id, OLD.title, OLD.description, OLD.tags);
+  INSERT INTO observations_fts(rowid, title, description, tags)
+  VALUES (NEW.id, NEW.title, NEW.description, NEW.tags);
+END;
+`
+
+/** Observation database instance with all store modules attached. Call `.close()` when done. */
+export interface ObsxaInstance {
+  project: ReturnType<typeof createProjectStore>
+  observation: ReturnType<typeof createObservationStore>
+  relation: ReturnType<typeof createRelationStore>
+  cluster: ReturnType<typeof createClusterStore>
+  dedup: ReturnType<typeof createDedupStore>
+  search: ReturnType<typeof createSearchStore>
+  analysis: ReturnType<typeof createAnalysisStore>
+  close(): void
+}
+
+/**
+ * Opens (or creates) an obsxa database and returns all store modules.
+ *
+ * Runs migrations automatically on first use or schema upgrade.
+ * Backs up the database before migrating unless disabled.
+ *
+ * @example
+ * ```ts
+ * const obsxa = createObsxa({ db: './research.db' })
+ * obsxa.observation.add({ projectId: 'my-project', title: 'Pattern found', source: 'scan' })
+ * obsxa.close()
+ * ```
+ */
+export function createObsxa(options: ObsxaOptions = { db: './obsxa.db' }): ObsxaInstance {
+  const resolved = {
+    autoMigrate: options.autoMigrate ?? true,
+    autoBackup: options.autoBackup ?? true,
+    backupDir: options.backupDir,
+  }
+
+  const sqlite = new Database(options.db)
+  sqlite.pragma('journal_mode = WAL')
+  sqlite.pragma('foreign_keys = ON')
+
+  ensureMetaTable(sqlite)
+  const beforeVersion = getSchemaVersion(sqlite)
+  if (beforeVersion !== null && beforeVersion > SCHEMA_VERSION) {
+    throw new Error(`Database schema version ${beforeVersion} is newer than supported ${SCHEMA_VERSION}. Upgrade obsxa package.`)
+  }
+
+  const needsMigration = beforeVersion === null || beforeVersion < SCHEMA_VERSION
+  if (needsMigration && !resolved.autoMigrate) {
+    throw new Error(`Database schema version ${beforeVersion ?? 0} requires migration to ${SCHEMA_VERSION}, but autoMigrate is disabled.`)
+  }
+
+  if (needsMigration && shouldBackup(options.db, resolved.autoBackup)) {
+    const backupPath = makeBackupPath(options.db, resolved.backupDir)
+    backupDatabase(options.db, backupPath)
+  }
+
+  const db = drizzle(sqlite)
+  if (needsMigration) {
+    migrate(db, { migrationsFolder: findMigrationsFolder() })
+    setSchemaVersion(sqlite, SCHEMA_VERSION)
+  }
+
+  sqlite.exec(CUSTOM_SQL)
+  try { sqlite.exec(FTS_SQL) } catch { }
+
+  return {
+    project: createProjectStore(db),
+    observation: createObservationStore(db),
+    relation: createRelationStore(db),
+    cluster: createClusterStore(db),
+    dedup: createDedupStore(db),
+    search: createSearchStore(sqlite),
+    analysis: createAnalysisStore(db),
+
+    close() {
+      sqlite.close()
+    },
+  }
+}

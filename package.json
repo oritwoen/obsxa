@@ -1,0 +1,58 @@
+{
+  "name": "obsxa",
+  "version": "0.0.1",
+  "description": "Structured observation management for research agents",
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.mjs",
+    "./ai": "./dist/ai.mjs"
+  },
+  "bin": {
+    "obsxa": "./dist/cli.mjs"
+  },
+  "files": [
+    "dist",
+    "drizzle"
+  ],
+  "scripts": {
+    "build": "obuild",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest",
+    "test:run": "vitest --run",
+    "generate": "drizzle-kit generate"
+  },
+  "dependencies": {
+    "@toon-format/toon": "^2.1.0",
+    "better-sqlite3": "^11.0.0",
+    "citty": "^0.2.1",
+    "consola": "^3.4.0",
+    "drizzle-orm": "^0.44.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "ai": "^6.0.116",
+    "drizzle-kit": "^0.31.0",
+    "obuild": "^0.2.0",
+    "typescript": "^5.8.0",
+    "vitest": "^4.0.0",
+    "zod": "^4.3.6"
+  },
+  "peerDependencies": {
+    "ai": "^4.0.0",
+    "zod": "^3.0.0"
+  },
+  "peerDependenciesMeta": {
+    "ai": {
+      "optional": true
+    },
+    "zod": {
+      "optional": true
+    }
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "esbuild"
+    ]
+  }
+}
