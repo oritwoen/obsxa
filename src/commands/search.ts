@@ -11,7 +11,7 @@ export default defineCommand({
     limit: { type: "string", description: "Max results" },
   },
   run({ args }) {
-    const limit = args.limit ? parseId(args.limit, "limit") : undefined;
+    const limit = args.limit === undefined ? undefined : parseId(args.limit, "limit");
     if (limit !== undefined && limit < 1) {
       consola.error("--limit must be at least 1");
       process.exit(1);

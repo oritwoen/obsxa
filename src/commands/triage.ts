@@ -20,7 +20,7 @@ export default defineCommand({
       process.exit(1);
     }
 
-    const limit = args.limit ? parseId(args.limit, "limit") : 25;
+    const limit = args.limit === undefined ? 25 : parseId(args.limit, "limit");
     if (limit < 1) {
       consola.error("--limit must be at least 1");
       process.exit(1);
