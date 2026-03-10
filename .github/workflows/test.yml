@@ -21,7 +21,7 @@ jobs:
           node-version: lts/*
           cache: pnpm
 
-      - run: pnpm i
+      - run: pnpm i --frozen-lockfile
 
       - name: Lint
         run: pnpm lint

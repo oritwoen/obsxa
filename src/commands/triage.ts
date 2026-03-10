@@ -20,13 +20,14 @@ export default defineCommand({
       process.exit(1);
     }
 
+    const limit = args.limit ? parseId(args.limit, "limit") : 25;
+    if (limit < 1) {
+      consola.error("--limit must be at least 1");
+      process.exit(1);
+    }
+
     const obsxa = open(args.db);
     try {
-      const limit = args.limit ? parseId(args.limit, "limit") : 25;
-      if (limit < 1) {
-        consola.error("--limit must be at least 1");
-        process.exit(1);
-      }
       const rows = obsxa.analysis.triage(args.project, limit, sort);
       if (args.toon || args.json) return output(rows, args.toon);
       if (rows.length === 0) return consola.info("No active observations found.");

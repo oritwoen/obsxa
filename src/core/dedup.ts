@@ -578,14 +578,8 @@ export function createDedupStore(db: ObsxaDB) {
             and(
               eq(duplicateCandidates.projectId, primary.projectId),
               or(
-                and(
-                  eq(duplicateCandidates.primaryObservationId, primaryObservationId),
-                  eq(duplicateCandidates.duplicateObservationId, duplicateObservationId),
-                ),
-                and(
-                  eq(duplicateCandidates.primaryObservationId, duplicateObservationId),
-                  eq(duplicateCandidates.duplicateObservationId, primaryObservationId),
-                ),
+                eq(duplicateCandidates.primaryObservationId, duplicateObservationId),
+                eq(duplicateCandidates.duplicateObservationId, duplicateObservationId),
               ),
             ),
           )

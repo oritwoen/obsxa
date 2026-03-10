@@ -11,13 +11,13 @@ export default defineCommand({
     limit: { type: "string", description: "Max results" },
   },
   run({ args }) {
+    const limit = args.limit ? parseId(args.limit, "limit") : undefined;
+    if (limit !== undefined && limit < 1) {
+      consola.error("--limit must be at least 1");
+      process.exit(1);
+    }
     const obsxa = open(args.db);
     try {
-      const limit = args.limit ? parseId(args.limit, "limit") : undefined;
-      if (limit !== undefined && limit < 1) {
-        consola.error("--limit must be at least 1");
-        process.exit(1);
-      }
       const rows = obsxa.search.search(args.query, args.project, limit);
       if (args.toon || args.json) return output(rows, args.toon);
       if (rows.length === 0) return consola.info("No matches found.");

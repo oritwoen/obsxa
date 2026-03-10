@@ -31,7 +31,7 @@ const reasonCodes: ObservationStatusReasonCode[] = [
 ];
 
 function parseTags(tags?: string): string[] | undefined {
-  if (!tags) return undefined;
+  if (tags === undefined) return undefined;
   return tags
     .split(",")
     .map((tag) => tag.trim())
