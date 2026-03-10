@@ -1,4 +1,4 @@
-import { observationRelations, observations } from './db.ts'
+import { observationRelations, observations } from "./db.ts";
 import type {
   Observation,
   ObservationRelation,
@@ -7,35 +7,39 @@ import type {
   ObservationStatusReasonCode,
   ObservationType,
   SourceType,
-} from '../types.ts'
+} from "../types.ts";
 
 export function parseTags(raw: unknown): string[] {
-  if (typeof raw !== 'string') return []
+  if (typeof raw !== "string") return [];
   try {
-    const parsed = JSON.parse(raw) as unknown
-    return Array.isArray(parsed) ? parsed.filter(v => typeof v === 'string') : []
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((v) => typeof v === "string") : [];
   } catch {
-    return []
+    return [];
   }
 }
 
 export function clampPercent(value: number, fallback: number): number {
-  if (!Number.isFinite(value)) return fallback
-  if (value < 0) return 0
-  if (value > 100) return 100
-  return Math.round(value)
+  if (!Number.isFinite(value)) return fallback;
+  if (value < 0) return 0;
+  if (value > 100) return 100;
+  return Math.round(value);
 }
 
 export function computeTriageScore(params: {
-  confidence: number
-  evidenceStrength: number
-  novelty: number
-  uncertainty: number
-  frequency: number
+  confidence: number;
+  evidenceStrength: number;
+  novelty: number;
+  uncertainty: number;
+  frequency: number;
 }): number {
-  const base = (params.confidence * 0.3) + (params.evidenceStrength * 0.35) + (params.novelty * 0.25) - (params.uncertainty * 0.2)
-  const frequencyBoost = Math.min(15, Math.max(0, params.frequency - 1) * 3)
-  return clampPercent(base + frequencyBoost + 20, 50)
+  const base =
+    params.confidence * 0.3 +
+    params.evidenceStrength * 0.35 +
+    params.novelty * 0.25 -
+    params.uncertainty * 0.2;
+  const frequencyBoost = Math.min(15, Math.max(0, params.frequency - 1) * 3);
+  return clampPercent(base + frequencyBoost + 20, 50);
 }
 
 export function toObservation(row: typeof observations.$inferSelect): Observation {
@@ -67,7 +71,7 @@ export function toObservation(row: typeof observations.$inferSelect): Observatio
     archivedReasonCode: row.archivedReasonCode as ObservationStatusReasonCode | null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
-  }
+  };
 }
 
 export function toRelation(row: typeof observationRelations.$inferSelect): ObservationRelation {
@@ -79,5 +83,5 @@ export function toRelation(row: typeof observationRelations.$inferSelect): Obser
     confidence: row.confidence,
     notes: row.notes,
     createdAt: row.createdAt,
-  }
+  };
 }

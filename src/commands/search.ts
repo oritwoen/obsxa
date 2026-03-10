@@ -1,26 +1,30 @@
-import { defineCommand } from 'citty'
-import { consola } from 'consola'
-import { dbArgs, open, output } from './_db.ts'
+import { defineCommand } from "citty";
+import { consola } from "consola";
+import { dbArgs, open, output } from "./_db.ts";
 
 export default defineCommand({
-  meta: { name: 'search', description: 'Search observations' },
+  meta: { name: "search", description: "Search observations" },
   args: {
     ...dbArgs,
-    query: { type: 'positional', required: true, description: 'Search query' },
-    project: { type: 'string', description: 'Project ID' },
-    limit: { type: 'string', description: 'Max results' },
+    query: { type: "positional", required: true, description: "Search query" },
+    project: { type: "string", description: "Project ID" },
+    limit: { type: "string", description: "Max results" },
   },
   run({ args }) {
-    const obsxa = open(args.db)
+    const obsxa = open(args.db);
     try {
-      const rows = obsxa.search.search(args.query, args.project, args.limit ? parseInt(args.limit, 10) : undefined)
-      if (args.toon || args.json) return output(rows, args.toon)
-      if (rows.length === 0) return consola.info('No matches found.')
+      const rows = obsxa.search.search(
+        args.query,
+        args.project,
+        args.limit ? parseInt(args.limit, 10) : undefined,
+      );
+      if (args.toon || args.json) return output(rows, args.toon);
+      if (rows.length === 0) return consola.info("No matches found.");
       for (const row of rows) {
-        consola.log(`[${row.rank}] #${row.observation.id} ${row.observation.title}`)
+        consola.log(`[${row.rank}] #${row.observation.id} ${row.observation.title}`);
       }
     } finally {
-      obsxa.close()
+      obsxa.close();
     }
   },
-})
+});

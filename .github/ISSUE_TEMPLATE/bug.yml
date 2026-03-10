@@ -1,0 +1,25 @@
+name: Bug
+description: Something broke or behaves wrong
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you expect vs what actually happened.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: Steps, code snippet, or a link to a minimal reproduction.
+    validations:
+      required: false
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else?
+      description: Node version, OS, stack trace, related issues — whatever helps.
+    validations:
+      required: false
