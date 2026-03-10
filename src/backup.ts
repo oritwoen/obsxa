@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, renameSync, unlinkSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 
 function companionPaths(dbPath: string): string[] {
@@ -28,6 +28,13 @@ export interface RestoreResult {
   preRestoreBackup: string | null;
 }
 
+/**
+ * Copy db/wal/shm files to a backup location.
+ *
+ * This performs file-level copies. If the database is actively being written to
+ * by another process, the copied files may be inconsistent. For guaranteed
+ * consistency, close the database connection before calling this function.
+ */
 export function backupDatabase(dbPath: string, outBasePath?: string): BackupResult {
   const basePath = outBasePath
     ? resolve(outBasePath)
@@ -70,18 +77,37 @@ export function restoreDatabase(dbPath: string, fromBasePath: string): RestoreRe
     preRestoreBackup = safety;
   }
 
-  const restored: string[] = [];
   const targetFiles = companionPaths(target);
+  const staged: { tmp: string; final: string }[] = [];
 
-  for (let i = 0; i < sourceFiles.length; i += 1) {
-    const sourceFile = sourceFiles[i];
-    const targetFile = targetFiles[i];
-    if (!sourceFile || !targetFile) continue;
-    if (copyOptional(sourceFile, targetFile)) restored.push(targetFile);
+  try {
+    for (let i = 0; i < sourceFiles.length; i += 1) {
+      const sourceFile = sourceFiles[i];
+      const targetFile = targetFiles[i];
+      if (!sourceFile || !targetFile) continue;
+      if (!existsSync(sourceFile)) continue;
+      const tmpFile = `${targetFile}.restoring`;
+      ensureParentDir(tmpFile);
+      copyFileSync(sourceFile, tmpFile);
+      staged.push({ tmp: tmpFile, final: targetFile });
+    }
+  } catch (error) {
+    for (const { tmp } of staged) {
+      try {
+        unlinkSync(tmp);
+      } catch {}
+    }
+    throw error;
   }
 
-  if (restored.length === 0) {
+  if (staged.length === 0) {
     throw new Error(`No files restored from backup: ${fromBasePath}`);
+  }
+
+  const restored: string[] = [];
+  for (const { tmp, final } of staged) {
+    renameSync(tmp, final);
+    restored.push(final);
   }
 
   return {

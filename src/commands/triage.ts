@@ -1,6 +1,6 @@
 import { defineCommand } from "citty";
 import { consola } from "consola";
-import { dbArgs, open, output } from "./_db.ts";
+import { dbArgs, open, output, parseId } from "./_db.ts";
 import type { TriageSort } from "../types.ts";
 
 const sortModes: TriageSort[] = ["triage", "recent"];
@@ -22,11 +22,7 @@ export default defineCommand({
 
     const obsxa = open(args.db);
     try {
-      const limit = args.limit ? parseInt(args.limit, 10) : 25;
-      if (Number.isNaN(limit) || limit < 1) {
-        consola.error("limit must be a positive integer");
-        process.exit(1);
-      }
+      const limit = args.limit ? parseId(args.limit, "limit") : 25;
       const rows = obsxa.analysis.triage(args.project, limit, sort);
       if (args.toon || args.json) return output(rows, args.toon);
       if (rows.length === 0) return consola.info("No active observations found.");

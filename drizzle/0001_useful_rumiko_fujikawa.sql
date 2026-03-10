@@ -1,0 +1,2 @@
+CREATE UNIQUE INDEX `idx_cluster_members_pair` ON `cluster_members` (`cluster_id`,`observation_id`);--> statement-breakpoint
+CREATE UNIQUE INDEX `idx_observation_relations_triple` ON `observation_relations` (`from_observation_id`,`to_observation_id`,`type`);

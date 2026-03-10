@@ -1,10 +1,19 @@
+import { isAbsolute } from "node:path";
 import { tool } from "ai";
 import { z } from "zod/v4";
 import { createObsxa } from "./index.ts";
 import type { ObsxaInstance } from "./index.ts";
 
+function sanitizeDbPath(path?: string): string {
+  const dbPath = path ?? "./obsxa.db";
+  if (isAbsolute(dbPath)) throw new Error("Absolute database paths are not allowed");
+  if (dbPath.includes("..")) throw new Error("Database path must not contain '..'");
+  if (!dbPath.endsWith(".db")) throw new Error("Database path must end with '.db'");
+  return dbPath;
+}
+
 function getOrCreate(dbPath?: string): ObsxaInstance {
-  return createObsxa({ db: dbPath ?? "./obsxa.db" });
+  return createObsxa({ db: sanitizeDbPath(dbPath) });
 }
 
 export const observationTool = tool({

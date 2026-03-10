@@ -12,18 +12,24 @@ export function createRelationStore(db: ObsxaDB) {
       }
 
       const fromObservation = db
-        .select({ id: observations.id })
+        .select({ id: observations.id, projectId: observations.projectId })
         .from(observations)
         .where(eq(observations.id, input.fromObservationId))
         .get();
       if (!fromObservation) throw new Error(`Observation #${input.fromObservationId} not found`);
 
       const toObservation = db
-        .select({ id: observations.id })
+        .select({ id: observations.id, projectId: observations.projectId })
         .from(observations)
         .where(eq(observations.id, input.toObservationId))
         .get();
       if (!toObservation) throw new Error(`Observation #${input.toObservationId} not found`);
+
+      if (fromObservation.projectId !== toObservation.projectId) {
+        throw new Error(
+          `Cannot create relation across projects ("${fromObservation.projectId}" and "${toObservation.projectId}")`,
+        );
+      }
 
       const confidence = input.confidence ?? 100;
       if (!Number.isFinite(confidence) || confidence < 0 || confidence > 100) {

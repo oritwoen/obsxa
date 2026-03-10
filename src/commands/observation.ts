@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { decode } from "@toon-format/toon";
 import { defineCommand } from "citty";
 import { consola } from "consola";
-import { dbArgs, open, output } from "./_db.ts";
+import { dbArgs, open, output, parseId } from "./_db.ts";
 import type {
   ObservationBatchUpdateRecord,
   ObservationImportRecord,
@@ -245,7 +245,7 @@ export default defineCommand({
           run({ args }) {
             const obsxa = open(args.db);
             try {
-              const observation = obsxa.observation.get(parseInt(args.id, 10));
+              const observation = obsxa.observation.get(parseId(args.id, "id"));
               if (!observation) {
                 consola.error(`Observation #${args.id} not found`);
                 process.exit(1);
@@ -272,7 +272,7 @@ export default defineCommand({
           run({ args }) {
             const obsxa = open(args.db);
             try {
-              const rows = obsxa.observation.transitions(parseInt(args.id, 10));
+              const rows = obsxa.observation.transitions(parseId(args.id, "id"));
               if (args.toon || args.json) return output(rows, args.toon);
               if (rows.length === 0) return consola.info("No transitions found.");
               for (const row of rows) {
@@ -296,7 +296,7 @@ export default defineCommand({
           run({ args }) {
             const obsxa = open(args.db);
             try {
-              const rows = obsxa.observation.edits(parseInt(args.id, 10));
+              const rows = obsxa.observation.edits(parseId(args.id, "id"));
               if (args.toon || args.json) return output(rows, args.toon);
               if (rows.length === 0) return consola.info("No edits found.");
               for (const row of rows) {
@@ -396,7 +396,7 @@ export default defineCommand({
 
             const obsxa = open(args.db);
             try {
-              const result = obsxa.observation.update(parseInt(args.id, 10), {
+              const result = obsxa.observation.update(parseId(args.id, "id"), {
                 title: args.title,
                 description: args.description,
                 type: args.type as ObservationType | undefined,
@@ -448,7 +448,7 @@ export default defineCommand({
 
             const obsxa = open(args.db);
             try {
-              const result = obsxa.observation.dismiss(parseInt(args.id, 10), {
+              const result = obsxa.observation.dismiss(parseId(args.id, "id"), {
                 reasonCode: args.reason as ObservationStatusReasonCode,
                 reasonNote: args.note,
               });
@@ -484,7 +484,7 @@ export default defineCommand({
             }
             const obsxa = open(args.db);
             try {
-              const result = obsxa.observation.archive(parseInt(args.id, 10), {
+              const result = obsxa.observation.archive(parseId(args.id, "id"), {
                 reasonCode: args.reason as ObservationStatusReasonCode,
                 reasonNote: args.note,
               });
@@ -508,7 +508,7 @@ export default defineCommand({
           run({ args }) {
             const obsxa = open(args.db);
             try {
-              const result = obsxa.observation.incrementFrequency(parseInt(args.id, 10));
+              const result = obsxa.observation.incrementFrequency(parseId(args.id, "id"));
               if (args.toon || args.json) return output(result, args.toon);
               consola.success(`Observation #${result.id} frequency is now ${result.frequency}`);
             } finally {

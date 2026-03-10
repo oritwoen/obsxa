@@ -219,7 +219,6 @@ export function createDedupStore(db: ObsxaDB) {
               .set({
                 reason,
                 score: storedScore,
-                status: "open",
                 updatedAt: new Date(),
               })
               .where(eq(duplicateCandidates.id, existing.id))

@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 
 export type ObsxaDB = BetterSQLite3Database;
@@ -56,17 +56,27 @@ export const observationStatusEvents = sqliteTable("observation_status_events", 
     .$defaultFn(() => new Date()),
 });
 
-export const observationRelations = sqliteTable("observation_relations", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  fromObservationId: integer("from_observation_id").notNull(),
-  toObservationId: integer("to_observation_id").notNull(),
-  type: text("type").notNull(),
-  confidence: integer("confidence").notNull().default(100),
-  notes: text("notes"),
-  createdAt: integer("created_at", { mode: "timestamp" })
-    .notNull()
-    .$defaultFn(() => new Date()),
-});
+export const observationRelations = sqliteTable(
+  "observation_relations",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    fromObservationId: integer("from_observation_id").notNull(),
+    toObservationId: integer("to_observation_id").notNull(),
+    type: text("type").notNull(),
+    confidence: integer("confidence").notNull().default(100),
+    notes: text("notes"),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (table) => [
+    uniqueIndex("idx_observation_relations_triple").on(
+      table.fromObservationId,
+      table.toObservationId,
+      table.type,
+    ),
+  ],
+);
 
 export const duplicateCandidates = sqliteTable("duplicate_candidates", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -127,11 +137,17 @@ export const observationEdits = sqliteTable("observation_edits", {
     .$defaultFn(() => new Date()),
 });
 
-export const clusterMembers = sqliteTable("cluster_members", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  clusterId: integer("cluster_id").notNull(),
-  observationId: integer("observation_id").notNull(),
-  createdAt: integer("created_at", { mode: "timestamp" })
-    .notNull()
-    .$defaultFn(() => new Date()),
-});
+export const clusterMembers = sqliteTable(
+  "cluster_members",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    clusterId: integer("cluster_id").notNull(),
+    observationId: integer("observation_id").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (table) => [
+    uniqueIndex("idx_cluster_members_pair").on(table.clusterId, table.observationId),
+  ],
+);

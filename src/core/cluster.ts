@@ -62,18 +62,24 @@ export function createClusterStore(db: ObsxaDB) {
 
     addMember(clusterId: number, observationId: number): ClusterMember {
       const cluster = db
-        .select({ id: clusters.id })
+        .select({ id: clusters.id, projectId: clusters.projectId })
         .from(clusters)
         .where(eq(clusters.id, clusterId))
         .get();
       if (!cluster) throw new Error(`Cluster #${clusterId} not found`);
 
       const observation = db
-        .select({ id: observations.id })
+        .select({ id: observations.id, projectId: observations.projectId })
         .from(observations)
         .where(eq(observations.id, observationId))
         .get();
       if (!observation) throw new Error(`Observation #${observationId} not found`);
+
+      if (cluster.projectId !== observation.projectId) {
+        throw new Error(
+          `Cannot add observation from project "${observation.projectId}" to cluster in project "${cluster.projectId}"`,
+        );
+      }
 
       const existing = db
         .select()

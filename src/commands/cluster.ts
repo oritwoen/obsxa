@@ -1,6 +1,6 @@
 import { defineCommand } from "citty";
 import { consola } from "consola";
-import { dbArgs, open, output } from "./_db.ts";
+import { dbArgs, open, output, parseId } from "./_db.ts";
 
 export default defineCommand({
   meta: { name: "cluster", description: "Manage observation clusters" },
@@ -69,8 +69,8 @@ export default defineCommand({
             const obsxa = open(args.db);
             try {
               const member = obsxa.cluster.addMember(
-                parseInt(args.cluster, 10),
-                parseInt(args.observation, 10),
+                parseId(args.cluster, "cluster"),
+                parseId(args.observation, "observation"),
               );
               if (args.toon || args.json) return output(member, args.toon);
               consola.success(`Member #${member.id} added to cluster #${member.clusterId}`);
@@ -91,7 +91,7 @@ export default defineCommand({
           run({ args }) {
             const obsxa = open(args.db);
             try {
-              const rows = obsxa.cluster.listMembers(parseInt(args.cluster, 10));
+              const rows = obsxa.cluster.listMembers(parseId(args.cluster, "cluster"));
               if (args.toon || args.json) return output(rows, args.toon);
               if (rows.length === 0) return consola.info("No cluster members found.");
               for (const row of rows) {

@@ -1,6 +1,6 @@
 import { defineCommand } from "citty";
 import { consola } from "consola";
-import { dbArgs, open, output } from "./_db.ts";
+import { dbArgs, open, output, parseId } from "./_db.ts";
 
 export default defineCommand({
   meta: { name: "promote", description: "Promote observation to hypothesis candidate" },
@@ -16,7 +16,7 @@ export default defineCommand({
   run({ args }) {
     const obsxa = open(args.db);
     try {
-      const id = parseInt(args.id, 10);
+      const id = parseId(args.id, "id");
       const observation = obsxa.observation.get(id);
       if (!observation) {
         consola.error(`Observation #${id} not found`);

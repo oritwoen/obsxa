@@ -27,6 +27,8 @@ jobs:
 
       - run: pnpm i
 
+      - run: pnpm test:run
+
       - run: pnpm build
 
       - run: pnpm publish --access public --no-git-checks

@@ -1,6 +1,6 @@
 import { defineCommand } from "citty";
 import { consola } from "consola";
-import { dbArgs, open, output } from "./_db.ts";
+import { dbArgs, open, output, parseId } from "./_db.ts";
 import type {
   DuplicateCandidateStatus,
   MergeConfidenceStrategy,
@@ -107,11 +107,7 @@ export default defineCommand({
               process.exit(1);
             }
 
-            const id = parseInt(args.id, 10);
-            if (Number.isNaN(id) || id < 1) {
-              consola.error("Candidate ID must be a positive integer");
-              process.exit(1);
-            }
+            const id = parseId(args.id, "id");
 
             const obsxa = open(args.db);
             try {
@@ -190,28 +186,22 @@ export default defineCommand({
               process.exit(1);
             }
 
-            const primaryId = parseInt(args.primary, 10);
-            const duplicateId = parseInt(args.duplicate, 10);
-            if (Number.isNaN(primaryId) || primaryId < 1) {
-              consola.error("Primary observation ID must be a positive integer");
-              process.exit(1);
-            }
-            if (Number.isNaN(duplicateId) || duplicateId < 1) {
-              consola.error("Duplicate observation ID must be a positive integer");
-              process.exit(1);
-            }
+            const primaryId = parseId(args.primary, "primary");
+            const duplicateId = parseId(args.duplicate, "duplicate");
 
             const relationConfidence = args["relation-confidence"]
-              ? parseInt(args["relation-confidence"], 10)
+              ? Number.parseInt(args["relation-confidence"], 10)
               : undefined;
-            if (
-              relationConfidence !== undefined &&
-              (!Number.isFinite(relationConfidence) ||
+            if (relationConfidence !== undefined) {
+              if (
+                !Number.isFinite(relationConfidence) ||
                 relationConfidence < 0 ||
-                relationConfidence > 100)
-            ) {
-              consola.error("relation-confidence must be between 0 and 100");
-              process.exit(1);
+                relationConfidence > 100 ||
+                !/^\d+$/.test(args["relation-confidence"]!)
+              ) {
+                consola.error("relation-confidence must be an integer between 0 and 100");
+                process.exit(1);
+              }
             }
 
             const obsxa = open(args.db);

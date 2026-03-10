@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { observations, observationEdits, observationStatusEvents, projects } from "./db.ts";
 import type { ObsxaDB } from "./db.ts";
 import { clampPercent, computeTriageScore, toObservation } from "./mappers.ts";
@@ -102,7 +102,10 @@ export function createObservationStore(db: ObsxaDB) {
             reasonNote: "Imported as archived",
           });
         }
-        if (record.status === "promoted" && record.promotedTo) {
+        if (record.status === "promoted") {
+          if (!record.promotedTo) {
+            throw new Error("Imported promoted observations must include promotedTo");
+          }
           return this.promote(created.id, record.promotedTo);
         }
         return created;
@@ -139,6 +142,7 @@ export function createObservationStore(db: ObsxaDB) {
         .select()
         .from(observationStatusEvents)
         .where(eq(observationStatusEvents.observationId, observationId))
+        .orderBy(asc(observationStatusEvents.createdAt), asc(observationStatusEvents.id))
         .all()
         .map(toTransition);
     },
@@ -148,6 +152,7 @@ export function createObservationStore(db: ObsxaDB) {
         .select()
         .from(observationEdits)
         .where(eq(observationEdits.observationId, observationId))
+        .orderBy(asc(observationEdits.createdAt), asc(observationEdits.id))
         .all()
         .map((row) => ({
           id: row.id,
@@ -164,12 +169,12 @@ export function createObservationStore(db: ObsxaDB) {
       if (!current) throw new Error(`Observation #${id} not found`);
 
       const values: Record<string, unknown> = { updatedAt: new Date() };
-      const edits: { field: string; oldValue: string | null; newValue: string | null }[] = [];
+      const editRecords: { field: string; oldValue: string | null; newValue: string | null }[] = [];
 
       function track(field: string, oldVal: unknown, newVal: unknown) {
         const o = oldVal == null ? null : String(oldVal);
         const n = newVal == null ? null : String(newVal);
-        if (o !== n) edits.push({ field, oldValue: o, newValue: n });
+        if (o !== n) editRecords.push({ field, oldValue: o, newValue: n });
       }
 
       if (fields.title !== undefined) {
@@ -260,25 +265,27 @@ export function createObservationStore(db: ObsxaDB) {
         frequency: current.frequency,
       });
 
-      const row = db
-        .update(observations)
-        .set(values)
-        .where(eq(observations.id, id))
-        .returning()
-        .get();
+      return db.transaction((tx) => {
+        const row = tx
+          .update(observations)
+          .set(values)
+          .where(eq(observations.id, id))
+          .returning()
+          .get();
 
-      for (const edit of edits) {
-        db.insert(observationEdits)
-          .values({
-            observationId: id,
-            field: edit.field,
-            oldValue: edit.oldValue,
-            newValue: edit.newValue,
-          })
-          .run();
-      }
+        for (const edit of editRecords) {
+          tx.insert(observationEdits)
+            .values({
+              observationId: id,
+              field: edit.field,
+              oldValue: edit.oldValue,
+              newValue: edit.newValue,
+            })
+            .run();
+        }
 
-      return toObservation(row);
+        return toObservation(row);
+      });
     },
 
     updateMany(records: ObservationBatchUpdateRecord[]): Observation[] {
@@ -297,29 +304,31 @@ export function createObservationStore(db: ObsxaDB) {
         );
       }
 
-      const row = db
-        .update(observations)
-        .set({
-          status: "dismissed",
-          dismissedReasonCode: transition.reasonCode,
-          archivedReasonCode: null,
-          updatedAt: new Date(),
-        })
-        .where(eq(observations.id, id))
-        .returning()
-        .get();
+      return db.transaction((tx) => {
+        const row = tx
+          .update(observations)
+          .set({
+            status: "dismissed",
+            dismissedReasonCode: transition.reasonCode,
+            archivedReasonCode: null,
+            updatedAt: new Date(),
+          })
+          .where(eq(observations.id, id))
+          .returning()
+          .get();
 
-      db.insert(observationStatusEvents)
-        .values({
-          observationId: id,
-          fromStatus: existing.status,
-          toStatus: "dismissed",
-          reasonCode: transition.reasonCode,
-          reasonNote: transition.reasonNote,
-        })
-        .run();
+        tx.insert(observationStatusEvents)
+          .values({
+            observationId: id,
+            fromStatus: existing.status,
+            toStatus: "dismissed",
+            reasonCode: transition.reasonCode,
+            reasonNote: transition.reasonNote,
+          })
+          .run();
 
-      return toObservation(row);
+        return toObservation(row);
+      });
     },
 
     archive(id: number, transition: TransitionObservation): Observation {
@@ -331,29 +340,31 @@ export function createObservationStore(db: ObsxaDB) {
         );
       }
 
-      const row = db
-        .update(observations)
-        .set({
-          status: "archived",
-          archivedReasonCode: transition.reasonCode,
-          dismissedReasonCode: null,
-          updatedAt: new Date(),
-        })
-        .where(eq(observations.id, id))
-        .returning()
-        .get();
+      return db.transaction((tx) => {
+        const row = tx
+          .update(observations)
+          .set({
+            status: "archived",
+            archivedReasonCode: transition.reasonCode,
+            dismissedReasonCode: null,
+            updatedAt: new Date(),
+          })
+          .where(eq(observations.id, id))
+          .returning()
+          .get();
 
-      db.insert(observationStatusEvents)
-        .values({
-          observationId: id,
-          fromStatus: existing.status,
-          toStatus: "archived",
-          reasonCode: transition.reasonCode,
-          reasonNote: transition.reasonNote,
-        })
-        .run();
+        tx.insert(observationStatusEvents)
+          .values({
+            observationId: id,
+            fromStatus: existing.status,
+            toStatus: "archived",
+            reasonCode: transition.reasonCode,
+            reasonNote: transition.reasonNote,
+          })
+          .run();
 
-      return toObservation(row);
+        return toObservation(row);
+      });
     },
 
     incrementFrequency(id: number): Observation {
@@ -387,30 +398,32 @@ export function createObservationStore(db: ObsxaDB) {
         );
       }
 
-      const row = db
-        .update(observations)
-        .set({
-          status: "promoted",
-          promotedTo: hypothesisRef,
-          dismissedReasonCode: null,
-          archivedReasonCode: null,
-          updatedAt: new Date(),
-        })
-        .where(eq(observations.id, id))
-        .returning()
-        .get();
+      return db.transaction((tx) => {
+        const row = tx
+          .update(observations)
+          .set({
+            status: "promoted",
+            promotedTo: hypothesisRef,
+            dismissedReasonCode: null,
+            archivedReasonCode: null,
+            updatedAt: new Date(),
+          })
+          .where(eq(observations.id, id))
+          .returning()
+          .get();
 
-      db.insert(observationStatusEvents)
-        .values({
-          observationId: id,
-          fromStatus: existing.status,
-          toStatus: "promoted",
-          reasonCode: "promoted",
-          reasonNote: hypothesisRef,
-        })
-        .run();
+        tx.insert(observationStatusEvents)
+          .values({
+            observationId: id,
+            fromStatus: existing.status,
+            toStatus: "promoted",
+            reasonCode: "promoted",
+            reasonNote: hypothesisRef,
+          })
+          .run();
 
-      return toObservation(row);
+        return toObservation(row);
+      });
     },
   };
 }

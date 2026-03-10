@@ -1,6 +1,6 @@
 import { defineCommand } from "citty";
 import { consola } from "consola";
-import { dbArgs, open, output } from "./_db.ts";
+import { dbArgs, open, output, parseId } from "./_db.ts";
 import { RELATION_TYPES } from "../types.ts";
 import type { ObservationRelationType } from "../types.ts";
 
@@ -30,7 +30,13 @@ export default defineCommand({
               consola.error("Cannot create self-reference relation");
               process.exit(1);
             }
-            const confidence = args.confidence ? parseInt(args.confidence, 10) : undefined;
+            const fromId = parseId(args.from, "from");
+            const toId = parseId(args.to, "to");
+            if (args.confidence && !/^\d+$/.test(args.confidence)) {
+              consola.error(`--confidence must be an integer, got "${args.confidence}"`);
+              process.exit(1);
+            }
+            const confidence = args.confidence ? Number(args.confidence) : undefined;
             if (
               confidence !== undefined &&
               (!Number.isFinite(confidence) || confidence < 0 || confidence > 100)
@@ -42,8 +48,8 @@ export default defineCommand({
             const obsxa = open(args.db);
             try {
               const relation = obsxa.relation.add({
-                fromObservationId: parseInt(args.from, 10),
-                toObservationId: parseInt(args.to, 10),
+                fromObservationId: fromId,
+                toObservationId: toId,
                 type: args.type as ObservationRelationType,
                 confidence,
                 notes: args.notes,
@@ -67,7 +73,7 @@ export default defineCommand({
           run({ args }) {
             const obsxa = open(args.db);
             try {
-              const rows = obsxa.relation.list(parseInt(args.observation, 10));
+              const rows = obsxa.relation.list(parseId(args.observation, "observation"));
               if (args.toon || args.json) return output(rows, args.toon);
               if (rows.length === 0) return consola.info("No relations found.");
               for (const row of rows) {
