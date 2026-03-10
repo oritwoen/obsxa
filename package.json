@@ -2,10 +2,13 @@
   "name": "obsxa",
   "version": "0.0.1",
   "description": "Structured observation management for research agents",
-  "type": "module",
-  "exports": {
-    ".": "./dist/index.mjs",
-    "./ai": "./dist/ai.mjs"
+  "homepage": "https://github.com/oritwoen/obsxa#readme",
+  "bugs": "https://github.com/oritwoen/obsxa/issues",
+  "license": "MIT",
+  "author": "oritwoen (https://github.com/oritwoen)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oritwoen/obsxa.git"
   },
   "bin": {
     "obsxa": "./dist/cli.mjs"
@@ -14,12 +17,31 @@
     "dist",
     "drizzle"
   ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    },
+    "./ai": {
+      "types": "./dist/ai.d.mts",
+      "import": "./dist/ai.mjs"
+    }
+  },
   "scripts": {
     "build": "obuild",
-    "typecheck": "tsc --noEmit",
+    "dev": "obuild --stub",
+    "lint": "oxlint . && oxfmt --check .",
+    "lint:fix": "oxlint . --fix && oxfmt .",
+    "typecheck": "tsgo --noEmit --skipLibCheck",
     "test": "vitest",
     "test:run": "vitest --run",
-    "generate": "drizzle-kit generate"
+    "generate": "drizzle-kit generate",
+    "prepack": "pnpm run build",
+    "release": "pnpm test:run && pnpm build && changelogen --release --push"
   },
   "dependencies": {
     "@toon-format/toon": "^2.1.0",
@@ -30,16 +52,21 @@
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.11",
+    "@types/node": "^25.3.0",
+    "@typescript/native-preview": "latest",
     "ai": "^6.0.116",
+    "changelogen": "^0.6.2",
     "drizzle-kit": "^0.31.0",
-    "obuild": "^0.2.0",
+    "obuild": "^0.4.31",
+    "oxfmt": "^0.36.0",
+    "oxlint": "^1.51.0",
     "typescript": "^5.8.0",
     "vitest": "^4.0.0",
     "zod": "^4.3.6"
   },
   "peerDependencies": {
-    "ai": "^4.0.0",
-    "zod": "^3.0.0"
+    "ai": ">=6.0.0",
+    "zod": ">=4.0.0"
   },
   "peerDependenciesMeta": {
     "ai": {
@@ -49,6 +76,10 @@
       "optional": true
     }
   },
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@10.30.3",
   "pnpm": {
     "onlyBuiltDependencies": [
       "better-sqlite3",

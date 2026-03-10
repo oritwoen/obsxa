@@ -1,6 +1,12 @@
-import type Database from 'better-sqlite3'
-import { parseTags } from './mappers.ts'
-import type { Observation, ObservationStatus, ObservationType, SearchResult, SourceType } from '../types.ts'
+import type Database from "better-sqlite3";
+import { parseTags } from "./mappers.ts";
+import type {
+  Observation,
+  ObservationStatus,
+  ObservationType,
+  SearchResult,
+  SourceType,
+} from "../types.ts";
 
 function rowToObservation(row: Record<string, unknown>): Observation {
   return {
@@ -27,11 +33,11 @@ function rowToObservation(row: Record<string, unknown>): Observation {
     uncertainty: (row.uncertainty as number) ?? 50,
     reproducibilityHint: (row.reproducibility_hint as string | null) ?? null,
     triageScore: (row.triage_score as number) ?? 50,
-    dismissedReasonCode: (row.dismissed_reason_code as Observation['dismissedReasonCode']) ?? null,
-    archivedReasonCode: (row.archived_reason_code as Observation['archivedReasonCode']) ?? null,
+    dismissedReasonCode: (row.dismissed_reason_code as Observation["dismissedReasonCode"]) ?? null,
+    archivedReasonCode: (row.archived_reason_code as Observation["archivedReasonCode"]) ?? null,
     createdAt: new Date((row.created_at as number) * 1000),
     updatedAt: row.updated_at ? new Date((row.updated_at as number) * 1000) : null,
-  }
+  };
 }
 
 export function createSearchStore(sqlite: Database.Database) {
@@ -43,39 +49,39 @@ export function createSearchStore(sqlite: Database.Database) {
           FROM observations o
           JOIN observations_fts fts ON o.id = fts.rowid
           WHERE observations_fts MATCH ?
-        `
-        const params: unknown[] = [query]
+        `;
+        const params: unknown[] = [query];
 
         if (projectId) {
-          sql += ' AND o.project_id = ?'
-          params.push(projectId)
+          sql += " AND o.project_id = ?";
+          params.push(projectId);
         }
 
-        sql += ' ORDER BY fts.rank LIMIT ?'
-        params.push(limit)
+        sql += " ORDER BY fts.rank LIMIT ?";
+        params.push(limit);
 
-        const rows = sqlite.prepare(sql).all(...params) as Record<string, unknown>[]
-        return rows.map((row, index) => ({ observation: rowToObservation(row), rank: index + 1 }))
+        const rows = sqlite.prepare(sql).all(...params) as Record<string, unknown>[];
+        return rows.map((row, index) => ({ observation: rowToObservation(row), rank: index + 1 }));
       } catch {
         let sql = `
           SELECT *
           FROM observations
           WHERE (title LIKE ? OR description LIKE ? OR tags LIKE ?)
-        `
-        const like = `%${query}%`
-        const params: unknown[] = [like, like, like]
+        `;
+        const like = `%${query}%`;
+        const params: unknown[] = [like, like, like];
 
         if (projectId) {
-          sql += ' AND project_id = ?'
-          params.push(projectId)
+          sql += " AND project_id = ?";
+          params.push(projectId);
         }
 
-        sql += ' ORDER BY created_at DESC LIMIT ?'
-        params.push(limit)
+        sql += " ORDER BY created_at DESC LIMIT ?";
+        params.push(limit);
 
-        const rows = sqlite.prepare(sql).all(...params) as Record<string, unknown>[]
-        return rows.map((row, index) => ({ observation: rowToObservation(row), rank: index + 1 }))
+        const rows = sqlite.prepare(sql).all(...params) as Record<string, unknown>[];
+        return rows.map((row, index) => ({ observation: rowToObservation(row), rank: index + 1 }));
       }
     },
-  }
+  };
 }

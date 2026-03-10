@@ -53,63 +53,63 @@ pnpm add ai zod
 ### API
 
 ```ts
-import { createObsxa } from 'obsxa'
+import { createObsxa } from "obsxa";
 
-const obsxa = createObsxa({ db: './research.db' })
+const obsxa = createObsxa({ db: "./research.db" });
 
 // Create a project
-obsxa.project.add({ id: 'sensor-data', name: 'Sensor Analysis' })
+obsxa.project.add({ id: "sensor-data", name: "Sensor Analysis" });
 
 // Record observations
 const o1 = obsxa.observation.add({
-  projectId: 'sensor-data',
-  title: 'Temperature spike at station 7',
-  description: 'Unusual 3σ deviation from baseline',
-  type: 'anomaly',
-  source: 'station-7',
-  sourceType: 'scan',
+  projectId: "sensor-data",
+  title: "Temperature spike at station 7",
+  description: "Unusual 3σ deviation from baseline",
+  type: "anomaly",
+  source: "station-7",
+  sourceType: "scan",
   confidence: 75,
-  tags: ['temperature', 'outlier'],
-  context: JSON.stringify({ instrument: 'DHT22', location: 'lab-3', ambient: 21.0 }),
-})
+  tags: ["temperature", "outlier"],
+  context: JSON.stringify({ instrument: "DHT22", location: "lab-3", ambient: 21.0 }),
+});
 
 const o2 = obsxa.observation.add({
-  projectId: 'sensor-data',
-  title: 'Humidity drop correlates with spike',
-  source: 'station-7-humidity',
-  sourceType: 'experiment',
+  projectId: "sensor-data",
+  title: "Humidity drop correlates with spike",
+  source: "station-7-humidity",
+  sourceType: "experiment",
   confidence: 90,
-})
+});
 
 // Seen again — increment frequency
-obsxa.observation.incrementFrequency(o1.id)
+obsxa.observation.incrementFrequency(o1.id);
 
 // Connect related observations
 obsxa.relation.add({
   fromObservationId: o2.id,
   toObservationId: o1.id,
-  type: 'supports',
-})
+  type: "supports",
+});
 
 // Group them
 const cluster = obsxa.cluster.add({
-  projectId: 'sensor-data',
-  name: 'Station 7 anomalies',
-})
-obsxa.cluster.addMember(cluster.id, o1.id)
-obsxa.cluster.addMember(cluster.id, o2.id)
+  projectId: "sensor-data",
+  name: "Station 7 anomalies",
+});
+obsxa.cluster.addMember(cluster.id, o1.id);
+obsxa.cluster.addMember(cluster.id, o2.id);
 
 // Promote to hypothesis when ready
-obsxa.observation.promote(o1.id, 'hypxa:sensor-data:1')
+obsxa.observation.promote(o1.id, "hypxa:sensor-data:1");
 
 // Analysis
-const frequent = obsxa.analysis.frequent('sensor-data')     // observations seen multiple times
-const unpromoted = obsxa.analysis.unpromoted('sensor-data')   // candidates for hypotheses
-const isolated = obsxa.analysis.isolated('sensor-data')       // observations with no relations
-const convergent = obsxa.analysis.convergent('sensor-data')   // confirmed by multiple sources
-const stats = obsxa.analysis.stats('sensor-data')             // project-level summary
+const frequent = obsxa.analysis.frequent("sensor-data"); // observations seen multiple times
+const unpromoted = obsxa.analysis.unpromoted("sensor-data"); // candidates for hypotheses
+const isolated = obsxa.analysis.isolated("sensor-data"); // observations with no relations
+const convergent = obsxa.analysis.convergent("sensor-data"); // confirmed by multiple sources
+const stats = obsxa.analysis.stats("sensor-data"); // project-level summary
 
-obsxa.close()
+obsxa.close();
 ```
 
 ### CLI
@@ -185,7 +185,7 @@ Add `--json` to any command for machine-readable output, or `--toon` for [TOON](
 `obsxa/ai` exports 7 ready-made tools for [AI SDK](https://ai-sdk.dev/) apps:
 
 ```ts
-import { generateText } from 'ai'
+import { generateText } from "ai";
 import {
   observationTool,
   relationTool,
@@ -194,7 +194,7 @@ import {
   searchTool,
   analysisTool,
   promoteTool,
-} from 'obsxa/ai'
+} from "obsxa/ai";
 
 const { text } = await generateText({
   model: yourModel,
@@ -207,68 +207,68 @@ const { text } = await generateText({
     analysis: analysisTool,
     promote: promoteTool,
   },
-  prompt: 'Record an observation: temperature sensor at station 7 shows unusual 3σ deviation.',
-})
+  prompt: "Record an observation: temperature sensor at station 7 shows unusual 3σ deviation.",
+});
 ```
 
 Each tool uses `discriminatedUnion` on an `operation` field for multiple operations through a single tool.
 
 ## CLI reference
 
-| Command | Description |
-|---------|-------------|
-| `obsxa project add` | Create a new project |
-| `obsxa project list` | List all projects |
-| `obsxa backup create` | Create backup of db/wal/shm files |
-| `obsxa backup restore` | Restore db/wal/shm from backup base path |
-| `obsxa observation add` | Record a new observation |
-| `obsxa observation get <id>` | Get observation details |
-| `obsxa observation list` | List observations (filter by project, status, type) |
-| `obsxa observation update <id>` | Update title, description, confidence, tags, etc. |
-| `obsxa observation bump <id>` | Increment frequency counter |
-| `obsxa observation edits <id>` | List field-level edit history |
-| `obsxa observation dismiss <id>` | Dismiss as noise/irrelevant |
-| `obsxa observation archive <id>` | Archive active observation with reason |
-| `obsxa observation transitions <id>` | List status transition history |
-| `obsxa observation import` | Import observations from JSON or TOON file |
-| `obsxa observation export` | Export project observations as JSON or TOON |
-| `obsxa observation batch-update` | Apply multiple updates from JSON array file |
-| `obsxa promote <id>` | Promote to hypothesis with reference |
-| `obsxa relation add` | Add a relation between observations |
-| `obsxa relation list` | List relations for an observation |
-| `obsxa dedup scan` | Scan for duplicate observation candidates |
-| `obsxa dedup candidates` | List duplicate candidates by status |
-| `obsxa dedup review` | Review a duplicate candidate decision |
-| `obsxa dedup merge` | Merge a duplicate into a primary observation |
-| `obsxa cluster add` | Create an observation cluster |
-| `obsxa cluster list` | List clusters in a project |
-| `obsxa cluster member` | Add observation to cluster |
-| `obsxa cluster members` | List observations in a cluster |
-| `obsxa search <query>` | Full-text search across observations |
-| `obsxa status <project>` | Project stats dashboard |
-| `obsxa triage <project>` | Rank active observations by triage score |
-| `obsxa frequent <project>` | Observations seen multiple times |
-| `obsxa unpromoted <project>` | Active observations not yet promoted |
+| Command                              | Description                                         |
+| ------------------------------------ | --------------------------------------------------- |
+| `obsxa project add`                  | Create a new project                                |
+| `obsxa project list`                 | List all projects                                   |
+| `obsxa backup create`                | Create backup of db/wal/shm files                   |
+| `obsxa backup restore`               | Restore db/wal/shm from backup base path            |
+| `obsxa observation add`              | Record a new observation                            |
+| `obsxa observation get <id>`         | Get observation details                             |
+| `obsxa observation list`             | List observations (filter by project, status, type) |
+| `obsxa observation update <id>`      | Update title, description, confidence, tags, etc.   |
+| `obsxa observation bump <id>`        | Increment frequency counter                         |
+| `obsxa observation edits <id>`       | List field-level edit history                       |
+| `obsxa observation dismiss <id>`     | Dismiss as noise/irrelevant                         |
+| `obsxa observation archive <id>`     | Archive active observation with reason              |
+| `obsxa observation transitions <id>` | List status transition history                      |
+| `obsxa observation import`           | Import observations from JSON or TOON file          |
+| `obsxa observation export`           | Export project observations as JSON or TOON         |
+| `obsxa observation batch-update`     | Apply multiple updates from JSON array file         |
+| `obsxa promote <id>`                 | Promote to hypothesis with reference                |
+| `obsxa relation add`                 | Add a relation between observations                 |
+| `obsxa relation list`                | List relations for an observation                   |
+| `obsxa dedup scan`                   | Scan for duplicate observation candidates           |
+| `obsxa dedup candidates`             | List duplicate candidates by status                 |
+| `obsxa dedup review`                 | Review a duplicate candidate decision               |
+| `obsxa dedup merge`                  | Merge a duplicate into a primary observation        |
+| `obsxa cluster add`                  | Create an observation cluster                       |
+| `obsxa cluster list`                 | List clusters in a project                          |
+| `obsxa cluster member`               | Add observation to cluster                          |
+| `obsxa cluster members`              | List observations in a cluster                      |
+| `obsxa search <query>`               | Full-text search across observations                |
+| `obsxa status <project>`             | Project stats dashboard                             |
+| `obsxa triage <project>`             | Rank active observations by triage score            |
+| `obsxa frequent <project>`           | Observations seen multiple times                    |
+| `obsxa unpromoted <project>`         | Active observations not yet promoted                |
 
 ## Observation types
 
-| Type | Use case |
-|------|----------|
-| `pattern` | Recurring structure or regularity in data |
-| `anomaly` | Unexpected deviation from expected behavior |
-| `measurement` | Quantitative data point or reading |
-| `correlation` | Relationship noticed between variables |
-| `artifact` | Physical/digital artifact found (image, file, QR code) |
+| Type          | Use case                                               |
+| ------------- | ------------------------------------------------------ |
+| `pattern`     | Recurring structure or regularity in data              |
+| `anomaly`     | Unexpected deviation from expected behavior            |
+| `measurement` | Quantitative data point or reading                     |
+| `correlation` | Relationship noticed between variables                 |
+| `artifact`    | Physical/digital artifact found (image, file, QR code) |
 
 ## Source types
 
-| Source type | Description |
-|-------------|-------------|
-| `experiment` | Result from a formal experiment |
-| `manual` | Human observation or manual inspection |
-| `scan` | Automated scan or sweep |
-| `computation` | Automated computation or analysis |
-| `external` | External data source (blockchain, API, etc.) |
+| Source type   | Description                                  |
+| ------------- | -------------------------------------------- |
+| `experiment`  | Result from a formal experiment              |
+| `manual`      | Human observation or manual inspection       |
+| `scan`        | Automated scan or sweep                      |
+| `computation` | Automated computation or analysis            |
+| `external`    | External data source (blockchain, API, etc.) |
 
 ## Observation lifecycle
 
@@ -285,104 +285,111 @@ active → promoted    (became a hypothesis)
 
 ## Observation relations
 
-| Type | Meaning |
-|------|---------|
-| `similar_to` | Two observations appear related |
-| `contradicts` | Two observations are incompatible |
-| `supports` | One observation strengthens another |
-| `derived_from` | One observation was derived from another |
-| `duplicate_of` | Observation is a duplicate of another |
-| `refines` | Observation refines granularity of another |
+| Type             | Meaning                                    |
+| ---------------- | ------------------------------------------ |
+| `similar_to`     | Two observations appear related            |
+| `contradicts`    | Two observations are incompatible          |
+| `supports`       | One observation strengthens another        |
+| `derived_from`   | One observation was derived from another   |
+| `duplicate_of`   | Observation is a duplicate of another      |
+| `refines`        | Observation refines granularity of another |
 | `same_signal_as` | Same underlying signal from another source |
 
 Self-referencing relations are prevented. Duplicate relations return the existing relation.
 
 ## Analysis functions
 
-| Function | Returns |
-|----------|---------|
-| `stats` | Project dashboard: counts by status/type, avg confidence, cluster count |
-| `frequent` | Observations with `frequency > 1`, sorted descending |
-| `isolated` | Observations with zero relations |
-| `convergent` | Observations with 2+ supporting relations from different sources |
-| `promoted` | Observations that became hypotheses |
-| `unpromoted` | Active observations without promotion — candidates for hypotheses |
+| Function     | Returns                                                                 |
+| ------------ | ----------------------------------------------------------------------- |
+| `stats`      | Project dashboard: counts by status/type, avg confidence, cluster count |
+| `frequent`   | Observations with `frequency > 1`, sorted descending                    |
+| `isolated`   | Observations with zero relations                                        |
+| `convergent` | Observations with 2+ supporting relations from different sources        |
+| `promoted`   | Observations that became hypotheses                                     |
+| `unpromoted` | Active observations without promotion — candidates for hypotheses       |
 
 ## Data model
 
 ```ts
 interface Observation {
-  id: number
-  projectId: string
-  title: string
-  description: string | null
-  type: 'pattern' | 'anomaly' | 'measurement' | 'correlation' | 'artifact'
-  source: string
-  sourceType: 'experiment' | 'manual' | 'scan' | 'computation' | 'external'
-  confidence: number
-  frequency: number
-  status: 'active' | 'promoted' | 'dismissed' | 'archived'
-  promotedTo: string | null
-  tags: string[]
-  data: string | null
-  context: string | null
-  capturedAt: Date | null
-  sourceRef: string | null
-  collector: string | null
-  inputHash: string | null
-  evidenceStrength: number
-  novelty: number
-  uncertainty: number
-  reproducibilityHint: string | null
-  triageScore: number
-  dismissedReasonCode: string | null
-  archivedReasonCode: string | null
-  createdAt: Date
-  updatedAt: Date | null
+  id: number;
+  projectId: string;
+  title: string;
+  description: string | null;
+  type: "pattern" | "anomaly" | "measurement" | "correlation" | "artifact";
+  source: string;
+  sourceType: "experiment" | "manual" | "scan" | "computation" | "external";
+  confidence: number;
+  frequency: number;
+  status: "active" | "promoted" | "dismissed" | "archived";
+  promotedTo: string | null;
+  tags: string[];
+  data: string | null;
+  context: string | null;
+  capturedAt: Date | null;
+  sourceRef: string | null;
+  collector: string | null;
+  inputHash: string | null;
+  evidenceStrength: number;
+  novelty: number;
+  uncertainty: number;
+  reproducibilityHint: string | null;
+  triageScore: number;
+  dismissedReasonCode: string | null;
+  archivedReasonCode: string | null;
+  createdAt: Date;
+  updatedAt: Date | null;
 }
 
 interface ObservationEdit {
-  id: number
-  observationId: number
-  field: string
-  oldValue: string | null
-  newValue: string | null
-  createdAt: Date
+  id: number;
+  observationId: number;
+  field: string;
+  oldValue: string | null;
+  newValue: string | null;
+  createdAt: Date;
 }
 
 interface ObservationRelation {
-  id: number
-  fromObservationId: number
-  toObservationId: number
-  type: 'similar_to' | 'contradicts' | 'supports' | 'derived_from' | 'duplicate_of' | 'refines' | 'same_signal_as'
-  confidence: number
-  notes: string | null
-  createdAt: Date
+  id: number;
+  fromObservationId: number;
+  toObservationId: number;
+  type:
+    | "similar_to"
+    | "contradicts"
+    | "supports"
+    | "derived_from"
+    | "duplicate_of"
+    | "refines"
+    | "same_signal_as";
+  confidence: number;
+  notes: string | null;
+  createdAt: Date;
 }
 
 interface Cluster {
-  id: number
-  projectId: string
-  name: string
-  description: string | null
-  createdAt: Date
+  id: number;
+  projectId: string;
+  name: string;
+  description: string | null;
+  createdAt: Date;
 }
 
 interface ProjectStats {
-  total: number
-  active: number
-  promoted: number
-  dismissed: number
-  archived: number
-  avgConfidence: number
-  totalClusters: number
+  total: number;
+  active: number;
+  promoted: number;
+  dismissed: number;
+  archived: number;
+  avgConfidence: number;
+  totalClusters: number;
   byType: {
-    pattern: number
-    anomaly: number
-    measurement: number
-    correlation: number
-    artifact: number
-  }
+    pattern: number;
+    anomaly: number;
+    measurement: number;
+    correlation: number;
+    artifact: number;
+  };
 }
 ```
 
@@ -409,11 +416,11 @@ You can configure startup behavior:
 
 ```ts
 createObsxa({
-  db: './obsxa.db',
-  autoMigrate: true,  // default
-  autoBackup: true,   // default
-  backupDir: './backups',
-})
+  db: "./obsxa.db",
+  autoMigrate: true, // default
+  autoBackup: true, // default
+  backupDir: "./backups",
+});
 ```
 
 ## License

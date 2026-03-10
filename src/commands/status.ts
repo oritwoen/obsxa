@@ -1,21 +1,23 @@
-import { defineCommand } from 'citty'
-import { consola } from 'consola'
-import { dbArgs, open, output } from './_db.ts'
+import { defineCommand } from "citty";
+import { consola } from "consola";
+import { dbArgs, open, output } from "./_db.ts";
 
 export default defineCommand({
-  meta: { name: 'status', description: 'Show project observation stats' },
+  meta: { name: "status", description: "Show project observation stats" },
   args: {
     ...dbArgs,
-    projectId: { type: 'positional', required: true, description: 'Project ID' },
+    projectId: { type: "positional", required: true, description: "Project ID" },
   },
   run({ args }) {
-    const obsxa = open(args.db)
+    const obsxa = open(args.db);
     try {
-      const stats = obsxa.analysis.stats(args.projectId)
-      if (args.toon || args.json) return output(stats, args.toon)
-      consola.log(`total=${stats.total} active=${stats.active} promoted=${stats.promoted} dismissed=${stats.dismissed} archived=${stats.archived} avgConfidence=${stats.avgConfidence} totalClusters=${stats.totalClusters}`)
+      const stats = obsxa.analysis.stats(args.projectId);
+      if (args.toon || args.json) return output(stats, args.toon);
+      consola.log(
+        `total=${stats.total} active=${stats.active} promoted=${stats.promoted} dismissed=${stats.dismissed} archived=${stats.archived} avgConfidence=${stats.avgConfidence} totalClusters=${stats.totalClusters}`,
+      );
     } finally {
-      obsxa.close()
+      obsxa.close();
     }
   },
-})
+});
