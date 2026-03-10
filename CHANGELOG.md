@@ -1,8 +1,6 @@
 # Changelog
 
-
 ## v0.0.2
-
 
 ### 🏡 Chore
 
@@ -11,4 +9,3 @@
 ### ❤️ Contributors
 
 - Ori ([@oritwoen](https://github.com/oritwoen))
-
