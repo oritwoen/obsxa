@@ -79,10 +79,17 @@ async function ensureMetaTable(client: Client): Promise<void> {
 }
 
 async function getSchemaVersion(client: Client): Promise<number | null> {
-  const result = await client.execute({
-    sql: "SELECT value FROM obsxa_meta WHERE key = ?",
-    args: ["schema_version"],
-  });
+  let result;
+  try {
+    result = await client.execute({
+      sql: "SELECT value FROM obsxa_meta WHERE key = ?",
+      args: ["schema_version"],
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/no such table:\s*obsxa_meta/i.test(message)) return null;
+    throw error;
+  }
   const row = result.rows[0] as { value?: unknown } | undefined;
   if (!row?.value) return null;
   const parsed = Number.parseInt(String(row.value), 10);
@@ -222,7 +229,6 @@ export async function createObsxa(
       await client.execute("PRAGMA foreign_keys = ON");
     } catch {}
 
-    await ensureMetaTable(client);
     const beforeVersion = await getSchemaVersion(client);
     if (beforeVersion !== null && beforeVersion > SCHEMA_VERSION) {
       throw new Error(
@@ -242,6 +248,8 @@ export async function createObsxa(
       backupDatabase(backupDbPath, backupPath);
     }
 
+    await ensureMetaTable(client);
+
     const db: ObsxaDB = drizzle({ client });
     if (needsMigration) {
       await migrate(db, { migrationsFolder: findMigrationsFolder() });
@@ -251,10 +259,17 @@ export async function createObsxa(
     for (const statement of CUSTOM_SQL) {
       await client.execute(statement);
     }
+    const ftsExists = await client.execute({
+      sql: "SELECT 1 FROM sqlite_master WHERE type = ? AND name = ? LIMIT 1",
+      args: ["table", "observations_fts"],
+    });
+
     for (const statement of FTS_SQL) {
       await client.execute(statement);
     }
-    await client.execute("INSERT INTO observations_fts(observations_fts) VALUES('rebuild')");
+    if (ftsExists.rows.length === 0 || needsMigration) {
+      await client.execute("INSERT INTO observations_fts(observations_fts) VALUES('rebuild')");
+    }
 
     return {
       project: createProjectStore(db),
