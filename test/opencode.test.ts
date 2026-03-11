@@ -626,6 +626,11 @@ describe("system.transform hook", () => {
     );
     const output = { system: [] as string[] };
     await hooks2["experimental.chat.system.transform"]!(systemInput(), output);
+
+    const obsxa = createObsxa({ db: dbPath });
+    const expectedCount = obsxa.search.search("Observation number 7 about test analysis patterns", undefined, 3).length;
+    obsxa.close();
+
     const obsSection = output.system.find((s) => s.includes("## Recent Observations"));
     expect(obsSection).toBeTruthy();
     const count = obsSection!
@@ -634,8 +639,9 @@ describe("system.transform hook", () => {
       .filter((line) =>
         /^- \[(pattern|anomaly|measurement|correlation|artifact)\]\s+/.test(line),
       ).length;
-    expect(count).toBeGreaterThan(0);
-    expect(count).toBeLessThanOrEqual(3);
+    expect(expectedCount).toBeGreaterThan(0);
+    expect(expectedCount).toBeLessThanOrEqual(3);
+    expect(count).toBe(expectedCount);
   });
 
   it("respects maxInjectedChars option", async () => {
@@ -651,7 +657,7 @@ describe("system.transform hook", () => {
       );
     }
     const maxInjectedChars = 200;
-    const formattingBuffer = 100;
+    const wrapperOverhead = `<obsxa-context>\n\n</obsxa-context>`.length;
     const plugin2 = createObsxaPlugin({ db: dbPath, projectId: "p1", maxInjectedChars });
     const hooks2 = await plugin2({ project: { id: "p1" }, directory: "/tmp", worktree: "/tmp" });
     trackedHooks.push(hooks2);
@@ -665,7 +671,7 @@ describe("system.transform hook", () => {
       (s) => s.includes("Recent Observations") || s.includes("obsxa-context"),
     );
     if (obsSection) {
-      expect(obsSection.length).toBeLessThanOrEqual(maxInjectedChars + formattingBuffer);
+      expect(obsSection.length).toBeLessThanOrEqual(maxInjectedChars + wrapperOverhead);
     }
   });
 
