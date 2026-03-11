@@ -69,12 +69,7 @@ function getCacheValue<T>(cache: Map<string, T>, key: string): T | undefined {
   return value;
 }
 
-function setCacheValue<T>(
-  cache: Map<string, T>,
-  key: string,
-  value: T,
-  maxSize: number,
-): void {
+function setCacheValue<T>(cache: Map<string, T>, key: string, value: T, maxSize: number): void {
   if (cache.has(key)) {
     cache.delete(key);
   }
@@ -199,240 +194,255 @@ export function createObsxaPlugin(options?: ObsxaPluginOptions): Plugin {
 
       return {
         destroy: async () => {
-        if (closed) return;
-        closed = true;
-        hashCache.clear();
-        sessionMessageObs.clear();
-        latestMessageBufferBySession.clear();
-        try {
-          await obsxa.close();
-        } catch (err) {
-          logHookError("destroy", err);
-        }
-      },
-
-      "chat.message": async (msgInput, msgOutput) => {
-        try {
           if (closed) return;
-          const output = msgOutput as { message: unknown; parts: unknown[] } | null;
-          if (!output) return;
-
-          const parts = (output.parts ?? []) as Array<{
-            type: string;
-            text?: string;
-            content?: string;
-          }>;
-          const text = parts
-            .filter((p) => p.type === "text")
-            .map((p) => p.text ?? p.content ?? "")
-            .join(" ")
-            .trim();
-
-          if (text.length < 20) return;
-          latestMessageBuffer = text;
-
-          if (msgInput.sessionID) {
-            setCacheValue(latestMessageBufferBySession, msgInput.sessionID, text, MAX_SESSION_CACHE_SIZE);
+          closed = true;
+          hashCache.clear();
+          sessionMessageObs.clear();
+          latestMessageBufferBySession.clear();
+          try {
+            await obsxa.close();
+          } catch (err) {
+            logHookError("destroy", err);
           }
+        },
 
-          const msgObj = output.message as { summary?: { title?: string } } | null | undefined;
-          const title = (msgObj?.summary?.title ?? text.slice(0, 100)).slice(0, 200);
+        "chat.message": async (msgInput, msgOutput) => {
+          try {
+            if (closed) return;
+            const output = msgOutput as { message: unknown; parts: unknown[] } | null;
+            if (!output) return;
 
-          const collector = "opencode:chat.message";
-          const hash = computeInputHash(text, collector, projectId);
+            const parts = (output.parts ?? []) as Array<{
+              type: string;
+              text?: string;
+              content?: string;
+            }>;
+            const text = parts
+              .filter((p) => p.type === "text")
+              .map((p) => p.text ?? p.content ?? "")
+              .join(" ")
+              .trim();
 
-          const existingId = await findByHash(obsxa, projectId, hash, hashCache);
-          if (existingId !== undefined) {
-            await obsxa.observation.incrementFrequency(existingId);
+            if (text.length < 20) return;
+            latestMessageBuffer = text;
+
             if (msgInput.sessionID) {
-              setCacheValue(sessionMessageObs, msgInput.sessionID, existingId, MAX_SESSION_CACHE_SIZE);
+              setCacheValue(
+                latestMessageBufferBySession,
+                msgInput.sessionID,
+                text,
+                MAX_SESSION_CACHE_SIZE,
+              );
             }
-            return;
+
+            const msgObj = output.message as { summary?: { title?: string } } | null | undefined;
+            const title = (msgObj?.summary?.title ?? text.slice(0, 100)).slice(0, 200);
+
+            const collector = "opencode:chat.message";
+            const hash = computeInputHash(text, collector, projectId);
+
+            const existingId = await findByHash(obsxa, projectId, hash, hashCache);
+            if (existingId !== undefined) {
+              await obsxa.observation.incrementFrequency(existingId);
+              if (msgInput.sessionID) {
+                setCacheValue(
+                  sessionMessageObs,
+                  msgInput.sessionID,
+                  existingId,
+                  MAX_SESSION_CACHE_SIZE,
+                );
+              }
+              return;
+            }
+
+            const sourceRef = `session:${msgInput.sessionID ?? "unknown"}:message:${msgInput.messageID ?? "unknown"}`;
+            const obs = await obsxa.observation.add({
+              projectId,
+              title,
+              description: text.length > 200 ? text.slice(0, 500) : undefined,
+              type: "pattern",
+              source: msgInput.agent ?? "user",
+              sourceType: "manual",
+              collector,
+              sourceRef,
+              inputHash: hash,
+              context: JSON.stringify({
+                sessionID: msgInput.sessionID,
+                agent: msgInput.agent,
+                model: msgInput.model,
+                messageID: msgInput.messageID,
+              }),
+            });
+
+            setCacheValue(hashCache, hash, obs.id, MAX_HASH_CACHE_SIZE);
+            if (msgInput.sessionID) {
+              setCacheValue(sessionMessageObs, msgInput.sessionID, obs.id, MAX_SESSION_CACHE_SIZE);
+            }
+          } catch (err) {
+            logHookError("chat.message", err);
           }
+        },
 
-          const sourceRef = `session:${msgInput.sessionID ?? "unknown"}:message:${msgInput.messageID ?? "unknown"}`;
-          const obs = await obsxa.observation.add({
-            projectId,
-            title,
-            description: text.length > 200 ? text.slice(0, 500) : undefined,
-            type: "pattern",
-            source: msgInput.agent ?? "user",
-            sourceType: "manual",
-            collector,
-            sourceRef,
-            inputHash: hash,
-            context: JSON.stringify({
-              sessionID: msgInput.sessionID,
-              agent: msgInput.agent,
-              model: msgInput.model,
-              messageID: msgInput.messageID,
-            }),
-          });
+        "tool.execute.after": async (toolInput, toolOutput) => {
+          try {
+            if (closed) return;
+            if (!toolOutput) return;
+            if (SKIP_TOOLS.has(toolInput.tool)) return;
 
-          setCacheValue(hashCache, hash, obs.id, MAX_HASH_CACHE_SIZE);
-          if (msgInput.sessionID) {
-            setCacheValue(sessionMessageObs, msgInput.sessionID, obs.id, MAX_SESSION_CACHE_SIZE);
-          }
-        } catch (err) {
-          logHookError("chat.message", err);
-        }
-      },
+            const title = (toolOutput.title || toolInput.tool).slice(0, 200);
+            const collector = "opencode:tool.execute.after";
+            const dedupPayload = `${toolOutput.title || toolInput.tool}\n${String(toolOutput.output ?? "")}`;
+            const hash = computeInputHash(dedupPayload, collector, projectId);
 
-      "tool.execute.after": async (toolInput, toolOutput) => {
-        try {
-          if (closed) return;
-          if (!toolOutput) return;
-          if (SKIP_TOOLS.has(toolInput.tool)) return;
+            const existingId = await findByHash(obsxa, projectId, hash, hashCache);
+            if (existingId !== undefined) {
+              await obsxa.observation.incrementFrequency(existingId);
+              return;
+            }
 
-          const title = (toolOutput.title || toolInput.tool).slice(0, 200);
-          const collector = "opencode:tool.execute.after";
-          const dedupPayload = `${toolOutput.title || toolInput.tool}\n${String(toolOutput.output ?? "")}`;
-          const hash = computeInputHash(dedupPayload, collector, projectId);
+            const sourceRef = `session:${toolInput.sessionID}:call:${toolInput.callID}`;
+            const description = toolOutput.output ? toolOutput.output.slice(0, 500) : undefined;
 
-          const existingId = await findByHash(obsxa, projectId, hash, hashCache);
-          if (existingId !== undefined) {
-            await obsxa.observation.incrementFrequency(existingId);
-            return;
-          }
+            const obs = await obsxa.observation.add({
+              projectId,
+              title,
+              description,
+              type: "measurement",
+              source: toolInput.tool,
+              sourceType: "computation",
+              collector,
+              sourceRef,
+              inputHash: hash,
+              context: JSON.stringify({
+                tool: toolInput.tool,
+                callID: toolInput.callID,
+                sessionID: toolInput.sessionID,
+              }),
+            });
 
-          const sourceRef = `session:${toolInput.sessionID}:call:${toolInput.callID}`;
-          const description = toolOutput.output ? toolOutput.output.slice(0, 500) : undefined;
+            setCacheValue(hashCache, hash, obs.id, MAX_HASH_CACHE_SIZE);
 
-          const obs = await obsxa.observation.add({
-            projectId,
-            title,
-            description,
-            type: "measurement",
-            source: toolInput.tool,
-            sourceType: "computation",
-            collector,
-            sourceRef,
-            inputHash: hash,
-            context: JSON.stringify({
-              tool: toolInput.tool,
-              callID: toolInput.callID,
-              sessionID: toolInput.sessionID,
-            }),
-          });
-
-          setCacheValue(hashCache, hash, obs.id, MAX_HASH_CACHE_SIZE);
-
-          // Create derived_from relation to message observation if exists for this session
-          const msgObsId = getCacheValue(sessionMessageObs, toolInput.sessionID);
-          if (msgObsId !== undefined) {
-            try {
+            // Create derived_from relation to message observation if exists for this session
+            const msgObsId = getCacheValue(sessionMessageObs, toolInput.sessionID);
+            if (msgObsId !== undefined) {
+              try {
                 await obsxa.relation.add({
                   fromObservationId: obs.id,
                   toObservationId: msgObsId,
                   type: "derived_from",
-              });
-            } catch (err) {
-              const message = err instanceof Error ? err.message : String(err);
-              const isConstraintViolation =
-                message.includes("UNIQUE constraint") || message.includes("SQLITE_CONSTRAINT");
-              if (!isConstraintViolation) {
-                logHookError("tool.execute.after.relation", err);
+                });
+              } catch (err) {
+                const message = err instanceof Error ? err.message : String(err);
+                const isConstraintViolation =
+                  message.includes("UNIQUE constraint") || message.includes("SQLITE_CONSTRAINT");
+                if (!isConstraintViolation) {
+                  logHookError("tool.execute.after.relation", err);
+                }
               }
             }
+          } catch (err) {
+            logHookError("tool.execute.after", err);
           }
-        } catch (err) {
-          logHookError("tool.execute.after", err);
-        }
-      },
+        },
 
-      event: async (evtInput) => {
-        try {
-          if (closed) return;
-          if (!evtInput?.event) return;
-          const evt = evtInput.event as { type: string; properties: Record<string, unknown> };
-          const obsType = TRACKED_EVENTS[evt.type];
-          if (!obsType) return;
+        event: async (evtInput) => {
+          try {
+            if (closed) return;
+            if (!evtInput?.event) return;
+            const evt = evtInput.event as { type: string; properties: Record<string, unknown> };
+            const obsType = TRACKED_EVENTS[evt.type];
+            if (!obsType) return;
 
-          const props = evt.properties ?? {};
+            const props = evt.properties ?? {};
 
-          let title: string;
-          let source: string;
-          if (evt.type === "file.edited") {
-            const file = (props.file as string) ?? "unknown";
-            title = `File edited: ${file}`;
-            source = file;
-          } else if (evt.type === "command.executed") {
-            const name = (props.name as string) ?? "unknown";
-            title = `Command executed: ${name}`;
-            source = name;
-          } else if (evt.type === "session.created") {
-            const info =
-              typeof props.info === "object" && props.info !== null
-                ? (props.info as Record<string, unknown>)
-                : null;
-            const sessionId = typeof info?.id === "string" ? info.id : "unknown";
-            title = `Session created: ${sessionId}`;
-            source = sessionId;
-          } else if (evt.type === "session.idle") {
-            const sessionId = typeof props.sessionID === "string" ? props.sessionID : "unknown";
-            const idleMs = typeof props.idleMs === "number" ? props.idleMs : undefined;
-            title = idleMs !== undefined ? `Session idle: ${sessionId} (${idleMs}ms)` : `Session idle: ${sessionId}`;
-            source = sessionId;
-          } else {
-            title = `Event: ${evt.type}`;
-            source = evt.type;
+            let title: string;
+            let source: string;
+            if (evt.type === "file.edited") {
+              const file = (props.file as string) ?? "unknown";
+              title = `File edited: ${file}`;
+              source = file;
+            } else if (evt.type === "command.executed") {
+              const name = (props.name as string) ?? "unknown";
+              title = `Command executed: ${name}`;
+              source = name;
+            } else if (evt.type === "session.created") {
+              const info =
+                typeof props.info === "object" && props.info !== null
+                  ? (props.info as Record<string, unknown>)
+                  : null;
+              const sessionId = typeof info?.id === "string" ? info.id : "unknown";
+              title = `Session created: ${sessionId}`;
+              source = sessionId;
+            } else if (evt.type === "session.idle") {
+              const sessionId = typeof props.sessionID === "string" ? props.sessionID : "unknown";
+              const idleMs = typeof props.idleMs === "number" ? props.idleMs : undefined;
+              title =
+                idleMs !== undefined
+                  ? `Session idle: ${sessionId} (${idleMs}ms)`
+                  : `Session idle: ${sessionId}`;
+              source = sessionId;
+            } else {
+              title = `Event: ${evt.type}`;
+              source = evt.type;
+            }
+
+            title = title.slice(0, 200);
+            const collector = `opencode:event:${evt.type}`;
+            const hash = computeInputHash(
+              `${evt.type}:${JSON.stringify(props)}`,
+              collector,
+              projectId,
+            );
+
+            const existingId = await findByHash(obsxa, projectId, hash, hashCache);
+            if (existingId !== undefined) {
+              await obsxa.observation.incrementFrequency(existingId);
+              return;
+            }
+
+            const obs = await obsxa.observation.add({
+              projectId,
+              title,
+              type: obsType,
+              source,
+              sourceType: "external",
+              collector,
+              inputHash: hash,
+              context: JSON.stringify(props),
+            });
+
+            setCacheValue(hashCache, hash, obs.id, MAX_HASH_CACHE_SIZE);
+          } catch (err) {
+            logHookError("event", err);
           }
+        },
 
-          title = title.slice(0, 200);
-          const collector = `opencode:event:${evt.type}`;
-          const hash = computeInputHash(
-            `${evt.type}:${JSON.stringify(props)}`,
-            collector,
-            projectId,
-          );
+        "experimental.chat.system.transform": async (_sysInput, sysOutput) => {
+          try {
+            if (closed) return;
+            if (!sysOutput || !Array.isArray(sysOutput.system)) return;
+            const maxObs = options?.maxInjectedObservations ?? 10;
+            const maxChars = options?.maxInjectedChars ?? 2000;
 
-          const existingId = await findByHash(obsxa, projectId, hash, hashCache);
-          if (existingId !== undefined) {
-            await obsxa.observation.incrementFrequency(existingId);
-            return;
+            // Always push agent instruction
+            sysOutput.system.push(
+              `<obsxa-instruction>\n${AGENT_INSTRUCTION}\n</obsxa-instruction>`,
+            );
+
+            const query =
+              (_sysInput.sessionID
+                ? latestMessageBufferBySession.get(_sysInput.sessionID)
+                : latestMessageBuffer) ?? projectName;
+
+            const results = await obsxa.search.search(query, undefined, maxObs);
+
+            if (results.length > 0) {
+              const formatted = formatObservations(results, maxChars);
+              sysOutput.system.push(`<obsxa-context>\n${formatted}\n</obsxa-context>`);
+            }
+          } catch (err) {
+            logHookError("system.transform", err);
           }
-
-          const obs = await obsxa.observation.add({
-            projectId,
-            title,
-            type: obsType,
-            source,
-            sourceType: "external",
-            collector,
-            inputHash: hash,
-            context: JSON.stringify(props),
-          });
-
-          setCacheValue(hashCache, hash, obs.id, MAX_HASH_CACHE_SIZE);
-        } catch (err) {
-          logHookError("event", err);
-        }
-      },
-
-      "experimental.chat.system.transform": async (_sysInput, sysOutput) => {
-        try {
-          if (closed) return;
-          if (!sysOutput || !Array.isArray(sysOutput.system)) return;
-          const maxObs = options?.maxInjectedObservations ?? 10;
-          const maxChars = options?.maxInjectedChars ?? 2000;
-
-          // Always push agent instruction
-          sysOutput.system.push(`<obsxa-instruction>\n${AGENT_INSTRUCTION}\n</obsxa-instruction>`);
-
-          const query =
-            (_sysInput.sessionID
-              ? latestMessageBufferBySession.get(_sysInput.sessionID)
-              : latestMessageBuffer) ?? projectName;
-
-          const results = await obsxa.search.search(query, undefined, maxObs);
-
-          if (results.length > 0) {
-            const formatted = formatObservations(results, maxChars);
-            sysOutput.system.push(`<obsxa-context>\n${formatted}\n</obsxa-context>`);
-          }
-        } catch (err) {
-          logHookError("system.transform", err);
-        }
         },
       };
     } catch (error) {

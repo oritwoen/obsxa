@@ -116,7 +116,11 @@ describe("createObsxaPlugin factory", () => {
 
   it("ensures project exists after factory call", async () => {
     const plugin = createObsxaPlugin({ db: dbPath, projectId: "test-project" });
-    const hooks = await plugin({ project: { id: "test-project" }, directory: "/tmp", worktree: "/tmp" });
+    const hooks = await plugin({
+      project: { id: "test-project" },
+      directory: "/tmp",
+      worktree: "/tmp",
+    });
     trackedHooks.push(hooks);
 
     const obsxa = await createObsxa({ db: dbPath });
@@ -130,8 +134,16 @@ describe("createObsxaPlugin factory", () => {
   it("is idempotent (no error on second call with same projectId)", async () => {
     const plugin = createObsxaPlugin({ db: dbPath, projectId: "my-project" });
 
-    const hooks1 = await plugin({ project: { id: "my-project" }, directory: "/tmp", worktree: "/tmp" });
-    const hooks2 = await plugin({ project: { id: "my-project" }, directory: "/tmp", worktree: "/tmp" });
+    const hooks1 = await plugin({
+      project: { id: "my-project" },
+      directory: "/tmp",
+      worktree: "/tmp",
+    });
+    const hooks2 = await plugin({
+      project: { id: "my-project" },
+      directory: "/tmp",
+      worktree: "/tmp",
+    });
     trackedHooks.push(hooks1, hooks2);
     expect(hooks2).toBeDefined();
   });
@@ -170,7 +182,11 @@ describe("createObsxaPlugin factory", () => {
 
   it("uses input.project.id as default projectId when not provided in options", async () => {
     const plugin = createObsxaPlugin({ db: dbPath });
-    const hooks = await plugin({ project: { id: "from-input" }, directory: "/tmp", worktree: "/tmp" });
+    const hooks = await plugin({
+      project: { id: "from-input" },
+      directory: "/tmp",
+      worktree: "/tmp",
+    });
     trackedHooks.push(hooks);
 
     const obsxa = await createObsxa({ db: dbPath });
@@ -182,7 +198,11 @@ describe("createObsxaPlugin factory", () => {
 
   it("uses projectId from options when provided", async () => {
     const plugin = createObsxaPlugin({ db: dbPath, projectId: "explicit-id" });
-    const hooks = await plugin({ project: { id: "from-input" }, directory: "/tmp", worktree: "/tmp" });
+    const hooks = await plugin({
+      project: { id: "from-input" },
+      directory: "/tmp",
+      worktree: "/tmp",
+    });
     trackedHooks.push(hooks);
 
     const obsxa = await createObsxa({ db: dbPath });
