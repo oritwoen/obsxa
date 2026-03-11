@@ -1,54 +1,89 @@
-# AGENTS.md
+# PROJECT KNOWLEDGE BASE
 
-## Stack
+**Generated:** 2026-03-11T22:28:42+01:00
+**Commit:** aaea389
+**Branch:** main
 
-- **Runtime**: Node.js >= 22
-- **Language**: TypeScript (strict)
-- **Build**: obuild (zero-config ESM builder)
-- **Test**: vitest
-- **Lint**: oxlint + oxfmt
-- **Typecheck**: tsgo (native TypeScript)
-- **Release**: changelogen
-- **Package manager**: pnpm
-- **Database**: SQLite via libsql + drizzle-orm
-- **Schema migrations**: drizzle-kit
+## OVERVIEW
 
-## Scripts
+obsxa is an ESM-only TypeScript library + CLI for structured observation tracking (project, observation, relation, cluster, dedup, analysis).
+Core data logic lives in `src/core`, CLI orchestration in `src/commands`, and AI SDK tools in `src/ai.ts`.
 
-- `pnpm dev` - stub build for development
-- `pnpm build` - production build
-- `pnpm test` - run tests (watch)
-- `pnpm test:run` - run tests (single run)
-- `pnpm lint` - lint + format check
-- `pnpm lint:fix` - auto-fix lint + format
-- `pnpm typecheck` - type checking
-- `pnpm generate` - generate drizzle migrations
-- `pnpm release` - test, build, and release
-
-## Structure
+## STRUCTURE
 
 ```
-src/
-  core/       - database, schema, CRUD operations
-  commands/   - CLI command handlers (citty)
-  index.ts    - public API barrel
-  ai.ts       - AI SDK tool exports
-  cli.ts      - CLI entrypoint
-  backup.ts   - database backup/restore
-  types.ts    - shared types
-test/         - tests
-drizzle/      - schema migrations
-dist/         - build output (generated)
+obsxa/
+|- src/
+|  |- cli.ts           # citty CLI entrypoint
+|  |- index.ts         # createObsxa API + migration/bootstrap path
+|  |- ai.ts            # AI SDK tools (zod discriminated unions)
+|  |- commands/        # CLI subcommand handlers
+|  `- core/            # stores, schema, dedup/analysis/search logic
+|- test/               # integration + parser tests
+|- drizzle/            # SQL migrations + drizzle metadata
+`- .github/workflows/  # test/release/autofix automation
 ```
 
-## Conventions
+## WHERE TO LOOK
 
-- ESM only (`"type": "module"`)
-- Exports use `.d.mts` / `.mjs` extensions
-- Strict TypeScript (all strict checks enabled)
-- No `as any`, `@ts-ignore`, or `@ts-expect-error`
-- SQLite schema changes go through drizzle-kit migrations
-- CLI supports `--json` and `--toon` output formats
+| Task | Location | Notes |
+|------|----------|-------|
+| CLI routing | `src/cli.ts` | Dynamic imports per command module |
+| Runtime/bootstrap | `src/index.ts` | Meta table, schema versioning, migration, FTS triggers |
+| DB schema | `src/core/db.ts` | Drizzle sqlite table declarations |
+| Observation lifecycle | `src/core/observation.ts` | Add/update/promote/archive/dismiss flow |
+| Dedup + merge | `src/core/dedup.ts` | Similarity scoring + merge transaction |
+| AI tool contracts | `src/ai.ts` | Multi-operation tool schemas |
+| CLI arg validation | `src/commands/observation.ts` | Parsing, percent range checks, import/export |
+| End-to-end behavior | `test/index.test.ts` | Full lifecycle + migration safety |
+| Real-world scenario test | `test/usgs-earthquake.test.ts` | Large fixture-driven integration test |
+
+## CODE MAP
+
+| Symbol | Type | Location | Refs | Role |
+|--------|------|----------|------|------|
+| `createObsxa` | Function | `src/index.ts` | High | Main API constructor + bootstrap pipeline |
+| `createDedupStore` | Function | `src/core/dedup.ts` | High | Duplicate scan/review/merge engine |
+| `main` | Constant | `src/cli.ts` | Medium | CLI command graph root |
+| `observationTool` | Constant | `src/ai.ts` | Medium | AI SDK observation operations |
+
+## CONVENTIONS
+
+- Runtime is Node >= 22, package manager is pnpm, build tool is obuild.
+- `src/commands` modules follow citty `defineCommand` style with `_db.ts` helpers.
+- Tests are in `test/` and favor temp SQLite DB isolation instead of mocks.
+- Release path is tag-driven CI + `pnpm release` (`test:run && build && changelogen`).
+
+## ANTI-PATTERNS (THIS PROJECT)
+
+- Do not introduce CommonJS; repo is ESM-only (`package.json`, `AGENTS.md`).
+- Do not use `as any`, `@ts-ignore`, or `@ts-expect-error` (`AGENTS.md`).
+- Do not bypass Drizzle migration flow for schema changes (`AGENTS.md`, `drizzle.config.ts`).
+- Do not remove `--json`/`--toon` output parity from CLI commands (`AGENTS.md`, command files).
+- Do not treat `drizzle/meta` and `dist/` as hand-edited source of truth.
+
+## UNIQUE STYLES
+
+- Store factories are split by domain (`create*Store`) and composed in `createObsxa`.
+- Dedup scoring combines exact fingerprints + token/trigram similarity and persists review events.
+- CLI command files are thin wrappers around store methods with explicit input coercion.
+
+## COMMANDS
+
+```bash
+pnpm lint
+pnpm typecheck
+pnpm test:run
+pnpm build
+pnpm generate
+pnpm release
+```
+
+## NOTES
+
+- `release.yml` publishes on `v*` tags with `--no-git-checks`; local validation still expected.
+- `autofix.yml` can push lint-fix commits on PRs and main.
+- `obsxa.db*` files may exist locally; treat as runtime artifacts.
 
 <!-- skilld -->
 
