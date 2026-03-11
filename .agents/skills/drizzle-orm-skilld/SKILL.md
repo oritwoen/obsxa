@@ -1,6 +1,6 @@
 ---
 name: drizzle-orm-skilld
-description: "Drizzle ORM package for SQL databases. ALWAYS use when writing code importing \"drizzle-orm\". Consult for debugging, best practices, or modifying drizzle-orm, drizzle orm."
+description: 'Drizzle ORM package for SQL databases. ALWAYS use when writing code importing "drizzle-orm". Consult for debugging, best practices, or modifying drizzle-orm, drizzle orm.'
 metadata:
   version: 0.44.7
   generated_at: 2026-03-11

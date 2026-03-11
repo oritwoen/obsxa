@@ -1,6 +1,6 @@
 ---
 name: ai-skilld
-description: "ALWAYS use when writing code importing \"ai\". Consult for debugging, best practices, or modifying ai."
+description: 'ALWAYS use when writing code importing "ai". Consult for debugging, best practices, or modifying ai.'
 metadata:
   version: 6.0.116
   generated_by: Codex · GPT-5.3 Codex
@@ -28,6 +28,7 @@ skilld search "releases:deprecated" -p ai
 Filters: `docs:`, `issues:`, `releases:` prefix narrows by source type.
 
 <!-- skilld:api-changes -->
+
 ## API Changes
 
 - BREAKING: `downloadBlob()` and `download()` now validate URLs and reject private/internal IP ranges, localhost, and non-HTTP protocols before fetching, which can change runtime behavior for previously permissive codepaths [source](./.skilld/pkg/CHANGELOG.md:L7)
@@ -42,9 +43,11 @@ Filters: `docs:`, `issues:`, `releases:` prefix narrows by source type.
 - DEPRECATED: `experimental_createMCPClient` imports moved from `ai` to `@ai-sdk/mcp` (including `Experimental_StdioMCPTransport`) [source](./.skilld/pkg/CHANGELOG.md:L887-L894)
 
 Also changed: `Agent` renamed to `BasicAgent` and dedicated `Agent` interface introduced (v6 migration) [source](./.skilld/pkg/CHANGELOG.md:L995) · `relevanceScore` renamed to `score` (reranking output) [source](./.skilld/pkg/CHANGELOG.md:L971) · `Output.array()` and `Output.choice()` added to `Output` helper API [source](./.skilld/pkg/CHANGELOG.md:L943-L944) · `streamText` gained `elementStream` for `Output.array()` outputs [source](./.skilld/pkg/CHANGELOG.md:L659)
+
 <!-- /skilld:api-changes -->
 
 <!-- skilld:best-practices -->
+
 ## Best Practices
 
 - Configure shared model/tool defaults through `defaultSettingsMiddleware` and keep per-call settings explicit in each request so defaults are centralized but overrideable where needed, instead of duplicating base configs in every model call. [source](./.skilld/pkg/docs/07-reference/01-ai-sdk-core/68-default-settings-middleware.mdx:L41-L43)

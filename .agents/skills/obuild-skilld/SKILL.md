@@ -1,6 +1,6 @@
 ---
 name: obuild-skilld
-description: "Zero-config ESM/TS package builder. ALWAYS use when writing code importing \"obuild\". Consult for debugging, best practices, or modifying obuild."
+description: 'Zero-config ESM/TS package builder. ALWAYS use when writing code importing "obuild". Consult for debugging, best practices, or modifying obuild.'
 metadata:
   version: 0.4.32
   generated_at: 2026-03-11

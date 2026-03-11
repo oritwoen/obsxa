@@ -1,6 +1,6 @@
 ---
 name: vitest-skilld
-description: "ALWAYS use when writing code importing \"vitest\". Consult for debugging, best practices, or modifying vitest."
+description: 'ALWAYS use when writing code importing "vitest". Consult for debugging, best practices, or modifying vitest.'
 metadata:
   version: 4.0.18
   generated_by: Codex · GPT-5.3 Codex
@@ -28,6 +28,7 @@ skilld search "releases:deprecated" -p vitest
 Filters: `docs:`, `issues:`, `releases:` prefix narrows by source type.
 
 <!-- skilld:api-changes -->
+
 ## API Changes
 
 - BREAKING: `ErrorWithDiff` was removed in favor of `TestError`, so imports/extension code referencing `ErrorWithDiff` now fail at compile/runtime [source](./.skilld/releases/v4.0.0.md:L18)
@@ -46,9 +47,11 @@ Filters: `docs:`, `issues:`, `releases:` prefix narrows by source type.
 - NEW: `onUnhandledError` and new test runner control APIs were added (`enableCoverage()`, `disableCoverage()`, `getSeed()`, `getGlobalTestNamePattern()`, and `relativeModuleId`) for advanced integration and reporter flows [source](./.skilld/releases/v4.0.0.md:L48-L65)
 
 Also changed: `onModuleRunner` (experimental) added to `worker.init` · `setupEnvironment` exported for custom pools (experimental) · `collect` → `import` and `prepare` removed (v4.0.14) · `experimental_parseSpecifications` added · `extensible test artifact API` added · `toBeOneOf` now supports `Set`
+
 <!-- /skilld:api-changes -->
 
 <!-- skilld:best-practices -->
+
 ## Best Practices
 
 - Prefer disabling test isolation (`--no-isolate` or `isolate: false`) for suites that are side-effect free and properly cleanup state, because this removes per-file isolation overhead; avoid it when tests rely on isolation for correctness. [source](./.skilld/docs/guide/improving-performance.md#test-isolation)

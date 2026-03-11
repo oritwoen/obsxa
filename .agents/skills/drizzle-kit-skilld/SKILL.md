@@ -1,6 +1,6 @@
 ---
 name: drizzle-kit-skilld
-description: "ALWAYS use when writing code importing \"drizzle-kit\". Consult for debugging, best practices, or modifying drizzle-kit, drizzle kit, drizzle-orm, drizzle orm."
+description: 'ALWAYS use when writing code importing "drizzle-kit". Consult for debugging, best practices, or modifying drizzle-kit, drizzle kit, drizzle-orm, drizzle orm.'
 metadata:
   version: 0.31.9
   generated_by: Codex · GPT-5.3 Codex
@@ -28,6 +28,7 @@ skilld search "releases:deprecated" -p drizzle-kit
 Filters: `docs:`, `issues:`, `releases:` prefix narrows by source type.
 
 <!-- skilld:api-changes -->
+
 ## API Changes
 
 - BREAKING: `postgres.js` driver instances passed to `drizzle()` now always return string dates and are mutated to use date mapping via `.toISOString()`, so downstream code that relied on external `postgres.js` date objects should migrate before upgrading. [source](./.skilld/docs/docs/latest-releases/drizzle-orm-v0300.md:L15-L23)
@@ -48,9 +49,11 @@ Filters: `docs:`, `issues:`, `releases:` prefix narrows by source type.
 - NEW: Added custom schema support when working with PostgreSQL enums. [source](./.skilld/docs/docs/latest-releases/drizzle-orm-v0308.md:L15-L16)
 
 Also changed: `db` Op-SQLite driver support in `drizzle-orm/op-sqlite` · `drizzle-orm/xata` (Xata HTTP) driver support · `pglite` driver support · `TiDB Cloud` serverless driver support.
+
 <!-- /skilld:api-changes -->
 
 <!-- skilld:best-practices -->
+
 ## Best Practices
 
 - Use `drizzle-kit generate` as the primary code-first migration authoring path, since it diffs current schema snapshots and writes both `migration.sql` and `snapshot.json` so downstream tools can apply migrations consistently. [source](./.skilld/docs/docs/drizzle-kit-generate.md:L23-L30)

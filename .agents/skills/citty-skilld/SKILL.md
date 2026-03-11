@@ -1,6 +1,6 @@
 ---
 name: citty-skilld
-description: "ALWAYS use when writing code importing \"citty\". Consult for debugging, best practices, or modifying citty."
+description: 'ALWAYS use when writing code importing "citty". Consult for debugging, best practices, or modifying citty.'
 metadata:
   version: 0.2.1
   generated_by: Codex · GPT-5.3 Codex
@@ -27,6 +27,7 @@ skilld search "releases:deprecated" -p citty
 Filters: `docs:`, `issues:`, `releases:` prefix narrows by source type.
 
 <!-- skilld:api-changes -->
+
 ## API Changes
 
 Cannot extract verifiable API changes for `citty` v0.2.1 from local references because required source directories are missing in this workspace snapshot.
@@ -34,4 +35,5 @@ Cannot extract verifiable API changes for `citty` v0.2.1 from local references b
 Expected source trees under `./.skilld/` are absent: `releases/` (including `releases/_INDEX.md`), `issues/` (including `issues/_INDEX.md`), `discussions/` (including `discussions/_INDEX.md`), and package docs such as `pkg/README.md`.
 
 Only prompt files are present: `./.skilld/PROMPT_api-changes.md` and `./.skilld/PROMPT_best-practices.md`. Per constraints, files starting with `PROMPT_` were not used as API-change references.
+
 <!-- /skilld:api-changes -->

@@ -1,6 +1,6 @@
 ---
 name: anomalyco-opencode
-description: "The open source coding agent. ALWAYS use when writing code importing \"anomalyco-opencode\". Consult for debugging, best practices, or modifying anomalyco-opencode, anomalyco opencode, opencode."
+description: 'The open source coding agent. ALWAYS use when writing code importing "anomalyco-opencode". Consult for debugging, best practices, or modifying anomalyco-opencode, anomalyco opencode, opencode.'
 metadata:
   version: main
   generated_at: 2026-03-11
