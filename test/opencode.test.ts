@@ -619,6 +619,7 @@ describe("system.transform hook", () => {
     }
     const plugin2 = createObsxaPlugin({ db: dbPath, projectId: "p1", maxInjectedObservations: 3 });
     const hooks2 = await plugin2({ project: { id: "p1" }, directory: "/tmp", worktree: "/tmp" });
+    trackedHooks.push(hooks2);
     await hooks2["chat.message"]!(
       chatInput("s2", "m99"),
       chatOutput({}, [textPart("Observation number 7 about test analysis patterns")]),
@@ -653,6 +654,7 @@ describe("system.transform hook", () => {
     const formattingBuffer = 100;
     const plugin2 = createObsxaPlugin({ db: dbPath, projectId: "p1", maxInjectedChars });
     const hooks2 = await plugin2({ project: { id: "p1" }, directory: "/tmp", worktree: "/tmp" });
+    trackedHooks.push(hooks2);
     await hooks2["chat.message"]!(
       chatInput("s2", "m99"),
       chatOutput({}, [textPart("Temperature analysis patterns observation test run")]),
@@ -714,6 +716,7 @@ describe("full lifecycle integration", () => {
       directory: "/tmp",
       worktree: "/tmp",
     });
+    trackedHooks.push(hooks);
 
     await hooks.event!(eventInput("session.created", { info: { id: "s1" } }));
 
