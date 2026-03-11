@@ -41,6 +41,11 @@ function rowToObservation(row: Record<string, unknown>): Observation {
 }
 
 export function createSearchStore(client: Client) {
+  function isRecoverableFtsQueryError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error);
+    return /(fts5:|malformed match expression|unterminated string)/i.test(message);
+  }
+
   return {
     async search(query: string, projectId?: string, limit = 50): Promise<SearchResult[]> {
       try {
@@ -63,7 +68,11 @@ export function createSearchStore(client: Client) {
         const result = await client.execute({ sql, args: params });
         const rows = result.rows as Record<string, unknown>[];
         return rows.map((row, index) => ({ observation: rowToObservation(row), rank: index + 1 }));
-      } catch {
+      } catch (error) {
+        if (!isRecoverableFtsQueryError(error)) {
+          throw error;
+        }
+
         let sql = `
           SELECT *
           FROM observations

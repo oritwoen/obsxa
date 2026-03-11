@@ -198,6 +198,24 @@ describe("obsxa", () => {
     expect(fallback.length).toBeGreaterThan(0);
   });
 
+  it("does not swallow non-recoverable fts errors", async () => {
+    await obsxa.project.add({ id: "p1", name: "Obs Project" });
+    await obsxa.observation.add({
+      projectId: "p1",
+      title: "Quantum anomaly",
+      source: "scan:1",
+    });
+
+    const client = createClient({ url: `file:${dbPath}` });
+    try {
+      await client.execute("DROP TABLE observations_fts");
+    } finally {
+      client.close();
+    }
+
+    await expect(obsxa.search.search("Quantum", "p1")).rejects.toThrow(/observations_fts/i);
+  });
+
   it("computes analysis stats, frequent, isolated, unpromoted", async () => {
     await obsxa.project.add({ id: "p1", name: "Obs Project" });
     const a = await obsxa.observation.add({
