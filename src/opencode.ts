@@ -231,6 +231,7 @@ export function createObsxaPlugin(options?: ObsxaPluginOptions): Plugin {
       "tool.execute.after": async (toolInput, toolOutput) => {
         try {
           if (closed) return;
+          if (!toolOutput) return;
           if (SKIP_TOOLS.has(toolInput.tool)) return;
 
           const title = (toolOutput.title || toolInput.tool).slice(0, 200);
