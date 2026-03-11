@@ -224,6 +224,9 @@ export async function createObsxa(options: ObsxaOptions = {}): Promise<ObsxaInst
 
   const dbUrl = toLibsqlUrl(dbPath);
   const backupDbPath = toBackupDbPath(dbPath);
+  if (backupDbPath) {
+    mkdirSync(dirname(backupDbPath), { recursive: true });
+  }
   const client = createClient({ url: dbUrl });
   try {
     try {
