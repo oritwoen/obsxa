@@ -94,15 +94,15 @@ function computeInputHash(payload: string, collector: string, projectId: string)
     .digest("hex");
 }
 
-function findByHash(
+async function findByHash(
   obsxa: ObsxaInstance,
   projectId: string,
   hash: string,
   cache: Map<string, number>,
-): number | undefined {
+): Promise<number | undefined> {
   const cached = getCacheValue(cache, hash);
   if (cached !== undefined) return cached;
-  const found = obsxa.observation.getByInputHash(projectId, hash);
+  const found = await obsxa.observation.getByInputHash(projectId, hash);
   if (!found) return undefined;
   setCacheValue(cache, hash, found.id, MAX_HASH_CACHE_SIZE);
   return found.id;
@@ -138,14 +138,14 @@ function logHookError(scope: string, err: unknown): void {
 export function createObsxaPlugin(options?: ObsxaPluginOptions): Plugin {
   return async (input: PluginInput): Promise<Hooks> => {
     const db = options?.db ?? getDefaultDbPath();
-    const obsxa = createObsxa({ db });
+    const obsxa = await createObsxa({ db });
     let closed = false;
 
     const projectId = options?.projectId ?? input.project.id;
     const projectName = options?.projectName ?? projectId;
 
-    if (!obsxa.project.get(projectId)) {
-      obsxa.project.add({ id: projectId, name: projectName });
+    if (!(await obsxa.project.get(projectId))) {
+      await obsxa.project.add({ id: projectId, name: projectName });
     }
 
     let latestMessageBuffer = "";
@@ -161,7 +161,7 @@ export function createObsxaPlugin(options?: ObsxaPluginOptions): Plugin {
         sessionMessageObs.clear();
         latestMessageBuffer = "";
         try {
-          obsxa.close();
+          await obsxa.close();
         } catch (err) {
           logHookError("destroy", err);
         }
@@ -194,14 +194,14 @@ export function createObsxaPlugin(options?: ObsxaPluginOptions): Plugin {
           const collector = "opencode:chat.message";
           const hash = computeInputHash(text, collector, projectId);
 
-          const existingId = findByHash(obsxa, projectId, hash, hashCache);
+          const existingId = await findByHash(obsxa, projectId, hash, hashCache);
           if (existingId !== undefined) {
-            obsxa.observation.incrementFrequency(existingId);
+            await obsxa.observation.incrementFrequency(existingId);
             return;
           }
 
           const sourceRef = `session:${msgInput.sessionID ?? "unknown"}:message:${msgInput.messageID ?? "unknown"}`;
-          const obs = obsxa.observation.add({
+          const obs = await obsxa.observation.add({
             projectId,
             title,
             description: text.length > 200 ? text.slice(0, 500) : undefined,
@@ -239,16 +239,16 @@ export function createObsxaPlugin(options?: ObsxaPluginOptions): Plugin {
           const dedupPayload = `${toolOutput.title || toolInput.tool}\n${String(toolOutput.output ?? "")}`;
           const hash = computeInputHash(dedupPayload, collector, projectId);
 
-          const existingId = findByHash(obsxa, projectId, hash, hashCache);
+          const existingId = await findByHash(obsxa, projectId, hash, hashCache);
           if (existingId !== undefined) {
-            obsxa.observation.incrementFrequency(existingId);
+            await obsxa.observation.incrementFrequency(existingId);
             return;
           }
 
           const sourceRef = `session:${toolInput.sessionID}:call:${toolInput.callID}`;
           const description = toolOutput.output ? toolOutput.output.slice(0, 500) : undefined;
 
-          const obs = obsxa.observation.add({
+          const obs = await obsxa.observation.add({
             projectId,
             title,
             description,
@@ -271,10 +271,10 @@ export function createObsxaPlugin(options?: ObsxaPluginOptions): Plugin {
           const msgObsId = getCacheValue(sessionMessageObs, toolInput.sessionID);
           if (msgObsId !== undefined) {
             try {
-              obsxa.relation.add({
-                fromObservationId: obs.id,
-                toObservationId: msgObsId,
-                type: "derived_from",
+                await obsxa.relation.add({
+                  fromObservationId: obs.id,
+                  toObservationId: msgObsId,
+                  type: "derived_from",
               });
             } catch (err) {
               const message = err instanceof Error ? err.message : String(err);
@@ -336,13 +336,13 @@ export function createObsxaPlugin(options?: ObsxaPluginOptions): Plugin {
             projectId,
           );
 
-          const existingId = findByHash(obsxa, projectId, hash, hashCache);
+          const existingId = await findByHash(obsxa, projectId, hash, hashCache);
           if (existingId !== undefined) {
-            obsxa.observation.incrementFrequency(existingId);
+            await obsxa.observation.incrementFrequency(existingId);
             return;
           }
 
-          const obs = obsxa.observation.add({
+          const obs = await obsxa.observation.add({
             projectId,
             title,
             type: obsType,
@@ -373,7 +373,7 @@ export function createObsxaPlugin(options?: ObsxaPluginOptions): Plugin {
           const query = latestMessageBuffer || projectName;
 
           // Cross-project search: pass undefined projectId
-          const results = obsxa.search.search(query, undefined, maxObs);
+          const results = await obsxa.search.search(query, undefined, maxObs);
 
           if (results.length > 0) {
             const formatted = formatObservations(results, maxChars);

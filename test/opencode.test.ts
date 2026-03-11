@@ -112,9 +112,9 @@ describe("createObsxaPlugin factory", () => {
     const plugin = createObsxaPlugin({ db: dbPath, projectId: "test-project" });
     await plugin({ project: { id: "test-project" }, directory: "/tmp", worktree: "/tmp" });
 
-    const obsxa = createObsxa({ db: dbPath });
-    const project = obsxa.project.get("test-project");
-    obsxa.close();
+    const obsxa = await createObsxa({ db: dbPath });
+    const project = await obsxa.project.get("test-project");
+    await obsxa.close();
 
     expect(project).not.toBeNull();
     expect(project?.id).toBe("test-project");
@@ -162,9 +162,9 @@ describe("createObsxaPlugin factory", () => {
     const plugin = createObsxaPlugin({ db: dbPath });
     await plugin({ project: { id: "from-input" }, directory: "/tmp", worktree: "/tmp" });
 
-    const obsxa = createObsxa({ db: dbPath });
-    const project = obsxa.project.get("from-input");
-    obsxa.close();
+    const obsxa = await createObsxa({ db: dbPath });
+    const project = await obsxa.project.get("from-input");
+    await obsxa.close();
 
     expect(project?.id).toBe("from-input");
   });
@@ -173,9 +173,9 @@ describe("createObsxaPlugin factory", () => {
     const plugin = createObsxaPlugin({ db: dbPath, projectId: "explicit-id" });
     await plugin({ project: { id: "from-input" }, directory: "/tmp", worktree: "/tmp" });
 
-    const obsxa = createObsxa({ db: dbPath });
-    const project = obsxa.project.get("explicit-id");
-    obsxa.close();
+    const obsxa = await createObsxa({ db: dbPath });
+    const project = await obsxa.project.get("explicit-id");
+    await obsxa.close();
 
     expect(project?.id).toBe("explicit-id");
   });
@@ -184,9 +184,9 @@ describe("createObsxaPlugin factory", () => {
     const plugin = createObsxaPlugin({ db: dbPath, projectId: "p1", projectName: "My Project" });
     await plugin({ project: { id: "p1" }, directory: "/tmp", worktree: "/tmp" });
 
-    const obsxa = createObsxa({ db: dbPath });
-    const project = obsxa.project.get("p1");
-    obsxa.close();
+    const obsxa = await createObsxa({ db: dbPath });
+    const project = await obsxa.project.get("p1");
+    await obsxa.close();
 
     expect(project?.name).toBe("My Project");
   });
@@ -195,9 +195,9 @@ describe("createObsxaPlugin factory", () => {
     const plugin = createObsxaPlugin({ db: dbPath, projectId: "p1" });
     await plugin({ project: { id: "p1" }, directory: "/tmp", worktree: "/tmp" });
 
-    const obsxa = createObsxa({ db: dbPath });
-    const project = obsxa.project.get("p1");
-    obsxa.close();
+    const obsxa = await createObsxa({ db: dbPath });
+    const project = await obsxa.project.get("p1");
+    await obsxa.close();
 
     expect(project?.name).toBe("p1");
   });
@@ -223,9 +223,9 @@ describe("chat.message hook", () => {
       chatInput("s1", "m1"),
       chatOutput({}, [textPart("Found interesting pattern in temperature data")]),
     );
-    const obsxa = createObsxa({ db: dbPath });
-    const obs = obsxa.observation.list("test-project");
-    obsxa.close();
+    const obsxa = await createObsxa({ db: dbPath });
+    const obs = await obsxa.observation.list("test-project");
+    await obsxa.close();
     expect(obs).toHaveLength(1);
     expect(obs[0].collector).toBe("opencode:chat.message");
     expect(obs[0].type).toBe("pattern");
@@ -238,9 +238,9 @@ describe("chat.message hook", () => {
       chatInput("sess-42", "msg-7"),
       chatOutput({}, [textPart("Analyzing Bitcoin key patterns in dataset")]),
     );
-    const obsxa = createObsxa({ db: dbPath });
-    const obs = obsxa.observation.list("test-project");
-    obsxa.close();
+    const obsxa = await createObsxa({ db: dbPath });
+    const obs = await obsxa.observation.list("test-project");
+    await obsxa.close();
     expect(obs[0].sourceRef).toBe("session:sess-42:message:msg-7");
   });
 
@@ -249,9 +249,9 @@ describe("chat.message hook", () => {
     const msg = chatOutput({}, [textPart("Found interesting pattern in sensor data analysis")]);
     await hooks["chat.message"]!(chatInput("s1", "m1"), msg);
     await hooks["chat.message"]!(chatInput("s1", "m2"), msg);
-    const obsxa = createObsxa({ db: dbPath });
-    const obs = obsxa.observation.list("test-project");
-    obsxa.close();
+    const obsxa = await createObsxa({ db: dbPath });
+    const obs = await obsxa.observation.list("test-project");
+    await obsxa.close();
     expect(obs).toHaveLength(1);
     expect(obs[0].frequency).toBe(2);
   });
@@ -267,9 +267,9 @@ describe("chat.message hook", () => {
       chatOutput({}, [textPart("Detected anomaly in token distribution over time")]),
     );
 
-    const obsxa = createObsxa({ db: dbPath });
-    const obs = obsxa.observation.list("test-project");
-    obsxa.close();
+    const obsxa = await createObsxa({ db: dbPath });
+    const obs = await obsxa.observation.list("test-project");
+    await obsxa.close();
 
     expect(obs).toHaveLength(2);
     expect(obs.every((item) => item.frequency === 1)).toBe(true);
@@ -281,9 +281,9 @@ describe("chat.message hook", () => {
       chatInput("s1", "m1"),
       chatOutput({}, [textPart("Temperature anomaly detected in dataset analysis")]),
     );
-    const obsxa = createObsxa({ db: dbPath });
-    const obs = obsxa.observation.list("p1");
-    obsxa.close();
+    const obsxa = await createObsxa({ db: dbPath });
+    const obs = await obsxa.observation.list("p1");
+    await obsxa.close();
     expect(obs[0].inputHash).toBeTruthy();
     expect(obs[0].inputHash).toHaveLength(64);
   });
@@ -291,9 +291,9 @@ describe("chat.message hook", () => {
   it("skips messages shorter than 20 chars", async () => {
     const hooks = await getHooks(dbPath);
     await hooks["chat.message"]!(chatInput("s1", "m1"), chatOutput({}, [textPart("short")]));
-    const obsxa = createObsxa({ db: dbPath });
-    const obs = obsxa.observation.list("test-project");
-    obsxa.close();
+    const obsxa = await createObsxa({ db: dbPath });
+    const obs = await obsxa.observation.list("test-project");
+    await obsxa.close();
     expect(obs).toHaveLength(0);
   });
 
@@ -316,9 +316,9 @@ describe("chat.message hook", () => {
       chatInput("s-ctx", "m-ctx", "claude", { providerID: "anthropic", modelID: "claude-3" }),
       chatOutput({}, [textPart("Context metadata test in temperature analysis")]),
     );
-    const obsxa = createObsxa({ db: dbPath });
-    const obs = obsxa.observation.list("test-project");
-    obsxa.close();
+    const obsxa = await createObsxa({ db: dbPath });
+    const obs = await obsxa.observation.list("test-project");
+    await obsxa.close();
     expect(obs[0].context).toBeTruthy();
     const ctx = JSON.parse(obs[0].context as string);
     expect(ctx.sessionID).toBe("s-ctx");
@@ -346,9 +346,9 @@ describe("tool.execute.after hook", () => {
       { tool: "write", sessionID: "s1", callID: "c1", args: { filePath: "/test.ts" } },
       { title: "Wrote test.ts", output: "File created", metadata: {} },
     );
-    const obsxa = createObsxa({ db: dbPath });
-    const obs = obsxa.observation.list("test-project");
-    obsxa.close();
+    const obsxa = await createObsxa({ db: dbPath });
+    const obs = await obsxa.observation.list("test-project");
+    await obsxa.close();
     expect(obs).toHaveLength(1);
     expect(obs[0].collector).toBe("opencode:tool.execute.after");
     expect(obs[0].type).toBe("measurement");
@@ -361,9 +361,9 @@ describe("tool.execute.after hook", () => {
       { tool: "read", sessionID: "s1", callID: "c1", args: {} },
       { title: "Read file", output: "content", metadata: {} },
     );
-    const obsxa = createObsxa({ db: dbPath });
-    const obs = obsxa.observation.list("test-project");
-    obsxa.close();
+    const obsxa = await createObsxa({ db: dbPath });
+    const obs = await obsxa.observation.list("test-project");
+    await obsxa.close();
     expect(obs).toHaveLength(0);
   });
 
@@ -373,9 +373,9 @@ describe("tool.execute.after hook", () => {
       { tool: "grep", sessionID: "s1", callID: "c1", args: {} },
       { title: "Grep result", output: "matches", metadata: {} },
     );
-    const obsxa = createObsxa({ db: dbPath });
-    const obs = obsxa.observation.list("test-project");
-    obsxa.close();
+    const obsxa = await createObsxa({ db: dbPath });
+    const obs = await obsxa.observation.list("test-project");
+    await obsxa.close();
     expect(obs).toHaveLength(0);
   });
 
@@ -385,9 +385,9 @@ describe("tool.execute.after hook", () => {
       { tool: "glob", sessionID: "s1", callID: "c1", args: {} },
       { title: "Glob result", output: "files", metadata: {} },
     );
-    const obsxa = createObsxa({ db: dbPath });
-    const obs = obsxa.observation.list("test-project");
-    obsxa.close();
+    const obsxa = await createObsxa({ db: dbPath });
+    const obs = await obsxa.observation.list("test-project");
+    await obsxa.close();
     expect(obs).toHaveLength(0);
   });
 
@@ -402,9 +402,9 @@ describe("tool.execute.after hook", () => {
       { tool: "write", sessionID: "s1", callID: "c2", args: {} },
       call,
     );
-    const obsxa = createObsxa({ db: dbPath });
-    const obs = obsxa.observation.list("test-project");
-    obsxa.close();
+    const obsxa = await createObsxa({ db: dbPath });
+    const obs = await obsxa.observation.list("test-project");
+    await obsxa.close();
     expect(obs).toHaveLength(1);
     expect(obs[0].frequency).toBe(2);
   });
@@ -415,9 +415,9 @@ describe("tool.execute.after hook", () => {
       { tool: "bash", sessionID: "sess-99", callID: "call-7", args: {} },
       { title: "Executed bash command", output: "ok", metadata: {} },
     );
-    const obsxa = createObsxa({ db: dbPath });
-    const obs = obsxa.observation.list("test-project");
-    obsxa.close();
+    const obsxa = await createObsxa({ db: dbPath });
+    const obs = await obsxa.observation.list("test-project");
+    await obsxa.close();
     expect(obs[0].sourceRef).toBe("session:sess-99:call:call-7");
   });
 
@@ -445,12 +445,12 @@ describe("tool.execute.after hook", () => {
       { tool: "bash", sessionID: "shared-session", callID: "c1", args: {} },
       { title: "Ran security scan command", output: "found issues", metadata: {} },
     );
-    const obsxa = createObsxa({ db: dbPath });
-    const obs = obsxa.observation.list("test-project");
+    const obsxa = await createObsxa({ db: dbPath });
+    const obs = await obsxa.observation.list("test-project");
     expect(obs).toHaveLength(2);
     const toolObs = obs.find((o) => o.collector === "opencode:tool.execute.after")!;
-    const relations = obsxa.relation.list(toolObs.id);
-    obsxa.close();
+    const relations = await obsxa.relation.list(toolObs.id);
+    await obsxa.close();
     expect(relations.some((r) => r.type === "derived_from")).toBe(true);
   });
 });
@@ -472,9 +472,9 @@ describe("event hook", () => {
   it("file.edited creates artifact observation", async () => {
     const hooks = await getHooks(dbPath);
     await hooks.event!(eventInput("file.edited", { file: "src/index.ts" }));
-    const obsxa = createObsxa({ db: dbPath });
-    const obs = obsxa.observation.list("test-project");
-    obsxa.close();
+    const obsxa = await createObsxa({ db: dbPath });
+    const obs = await obsxa.observation.list("test-project");
+    await obsxa.close();
     expect(obs).toHaveLength(1);
     expect(obs[0].type).toBe("artifact");
     expect(obs[0].collector).toBe("opencode:event:file.edited");
@@ -484,9 +484,9 @@ describe("event hook", () => {
   it("session.created creates pattern observation", async () => {
     const hooks = await getHooks(dbPath);
     await hooks.event!(eventInput("session.created", { info: { id: "sess-1" } }));
-    const obsxa = createObsxa({ db: dbPath });
-    const obs = obsxa.observation.list("test-project");
-    obsxa.close();
+    const obsxa = await createObsxa({ db: dbPath });
+    const obs = await obsxa.observation.list("test-project");
+    await obsxa.close();
     expect(obs).toHaveLength(1);
     expect(obs[0].type).toBe("pattern");
     expect(obs[0].collector).toBe("opencode:event:session.created");
@@ -495,9 +495,9 @@ describe("event hook", () => {
   it("command.executed creates correlation observation", async () => {
     const hooks = await getHooks(dbPath);
     await hooks.event!(eventInput("command.executed", { name: "git-commit", sessionID: "s1" }));
-    const obsxa = createObsxa({ db: dbPath });
-    const obs = obsxa.observation.list("test-project");
-    obsxa.close();
+    const obsxa = await createObsxa({ db: dbPath });
+    const obs = await obsxa.observation.list("test-project");
+    await obsxa.close();
     expect(obs).toHaveLength(1);
     expect(obs[0].type).toBe("correlation");
     expect(obs[0].title).toContain("git-commit");
@@ -506,9 +506,9 @@ describe("event hook", () => {
   it("irrelevant events (pty.created) are skipped", async () => {
     const hooks = await getHooks(dbPath);
     await hooks.event!(eventInput("pty.created", {}));
-    const obsxa = createObsxa({ db: dbPath });
-    const obs = obsxa.observation.list("test-project");
-    obsxa.close();
+    const obsxa = await createObsxa({ db: dbPath });
+    const obs = await obsxa.observation.list("test-project");
+    await obsxa.close();
     expect(obs).toHaveLength(0);
   });
 
@@ -517,9 +517,9 @@ describe("event hook", () => {
     const evt = eventInput("file.edited", { file: "src/main.ts" });
     await hooks.event!(evt);
     await hooks.event!(evt);
-    const obsxa = createObsxa({ db: dbPath });
-    const obs = obsxa.observation.list("test-project");
-    obsxa.close();
+    const obsxa = await createObsxa({ db: dbPath });
+    const obs = await obsxa.observation.list("test-project");
+    await obsxa.close();
     expect(obs).toHaveLength(1);
     expect(obs[0].frequency).toBe(2);
   });
@@ -627,9 +627,11 @@ describe("system.transform hook", () => {
     const output = { system: [] as string[] };
     await hooks2["experimental.chat.system.transform"]!(systemInput(), output);
 
-    const obsxa = createObsxa({ db: dbPath });
-    const expectedCount = obsxa.search.search("Observation number 7 about test analysis patterns", undefined, 3).length;
-    obsxa.close();
+    const obsxa = await createObsxa({ db: dbPath });
+    const expectedCount = (
+      await obsxa.search.search("Observation number 7 about test analysis patterns", undefined, 3)
+    ).length;
+    await obsxa.close();
 
     const obsSection = output.system.find((s) => s.includes("## Recent Observations"));
     expect(obsSection).toBeTruthy();
@@ -746,8 +748,8 @@ describe("full lifecycle integration", () => {
     const output = { system: [] as string[] };
     await hooks["experimental.chat.system.transform"]!(systemInput(), output);
 
-    const obsxa = createObsxa({ db: dbPath });
-    const observations = obsxa.observation.list("integration-test");
+    const obsxa = await createObsxa({ db: dbPath });
+    const observations = await obsxa.observation.list("integration-test");
 
     expect(observations).toHaveLength(4);
 
@@ -758,7 +760,7 @@ describe("full lifecycle integration", () => {
 
     const toolObs = observations.find((o) => o.collector === "opencode:tool.execute.after");
     expect(toolObs).toBeDefined();
-    const relations = obsxa.relation.list(toolObs!.id);
+    const relations = await obsxa.relation.list(toolObs!.id);
     expect(
       relations.some(
         (r) =>
@@ -775,6 +777,6 @@ describe("full lifecycle integration", () => {
       injected.includes("Bitcoin") || injected.includes("key patterns") || injected.includes("RNG"),
     ).toBe(true);
 
-    obsxa.close();
+    await obsxa.close();
   });
 });
