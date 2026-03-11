@@ -125,6 +125,14 @@ function toLibsqlUrl(dbPath: string): string {
   return `file:${dbPath}`;
 }
 
+function toBackupDbPath(dbPath: string): string | null {
+  if (dbPath === ":memory:") return null;
+  if (/^(?:libsql:|https?:|wss?:)/.test(dbPath)) return null;
+  if (dbPath.startsWith("file://")) return fileURLToPath(dbPath);
+  if (dbPath.startsWith("file:")) return dbPath.slice(5);
+  return dbPath;
+}
+
 const CUSTOM_SQL = [
   "CREATE INDEX IF NOT EXISTS idx_observations_project ON observations(project_id)",
   "CREATE INDEX IF NOT EXISTS idx_observations_status ON observations(status)",
@@ -203,7 +211,9 @@ export async function createObsxa(
     backupDir: options.backupDir,
   };
 
-  const client = createClient({ url: toLibsqlUrl(options.db) });
+  const dbUrl = toLibsqlUrl(options.db);
+  const backupDbPath = toBackupDbPath(options.db);
+  const client = createClient({ url: dbUrl });
   try {
     try {
       await client.execute("PRAGMA journal_mode = WAL");
@@ -227,9 +237,9 @@ export async function createObsxa(
       );
     }
 
-    if (needsMigration && shouldBackup(options.db, resolved.autoBackup)) {
-      const backupPath = makeBackupPath(options.db, resolved.backupDir);
-      backupDatabase(options.db, backupPath);
+    if (backupDbPath && needsMigration && shouldBackup(backupDbPath, resolved.autoBackup)) {
+      const backupPath = makeBackupPath(backupDbPath, resolved.backupDir);
+      backupDatabase(backupDbPath, backupPath);
     }
 
     const db: ObsxaDB = drizzle({ client });
@@ -241,11 +251,10 @@ export async function createObsxa(
     for (const statement of CUSTOM_SQL) {
       await client.execute(statement);
     }
-    try {
-      for (const statement of FTS_SQL) {
-        await client.execute(statement);
-      }
-    } catch {}
+    for (const statement of FTS_SQL) {
+      await client.execute(statement);
+    }
+    await client.execute("INSERT INTO observations_fts(observations_fts) VALUES('rebuild')");
 
     return {
       project: createProjectStore(db),
