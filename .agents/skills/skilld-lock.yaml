@@ -1,0 +1,57 @@
+skills:
+  drizzle-kit-skilld:
+    packageName: drizzle-kit
+    version: 0.31.9
+    packages: "drizzle-kit@0.31.9"
+    repo: drizzle-team/drizzle-orm
+    source: "https://github.com/drizzle-team/drizzle-orm/tree/v0.31.9/docs"
+    syncedAt: 2026-03-11
+    generator: skilld
+  drizzle-orm-skilld:
+    packageName: drizzle-orm
+    version: 0.44.7
+    packages: "drizzle-orm@0.44.7"
+    repo: drizzle-team/drizzle-orm
+    source: "https://orm.drizzle.team/**"
+    syncedAt: 2026-03-11
+    generator: skilld
+  citty-skilld:
+    packageName: citty
+    version: 0.2.1
+    packages: "citty@0.2.1"
+    repo: unjs/citty
+    source: "ungh://unjs/citty"
+    syncedAt: 2026-03-11
+    generator: skilld
+  ai-skilld:
+    packageName: ai
+    version: 6.0.116
+    packages: "ai@6.0.116"
+    repo: vercel/ai
+    source: "https://ai-sdk.dev/llms.txt"
+    syncedAt: 2026-03-11
+    generator: skilld
+  vitest-skilld:
+    packageName: vitest
+    version: 4.0.18
+    packages: "vitest@4.0.18"
+    repo: vitest-dev/vitest
+    source: "https://github.com/vitest-dev/vitest/tree/v4.0.18/docs"
+    syncedAt: 2026-03-11
+    generator: skilld
+  obuild-skilld:
+    packageName: obuild
+    version: 0.4.32
+    packages: "obuild@0.4.32"
+    repo: unjs/obuild
+    source: "ungh://unjs/obuild"
+    syncedAt: 2026-03-11
+    generator: skilld
+  anomalyco-opencode:
+    packageName: anomalyco-opencode
+    version: main
+    packages: "anomalyco-opencode@main"
+    repo: anomalyco/opencode
+    source: "https://opencode.ai/**"
+    syncedAt: 2026-03-11
+    generator: skilld
