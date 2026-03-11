@@ -13,10 +13,10 @@ export default defineCommand({
         name: { type: "string", required: true, description: "Project name" },
         description: { type: "string", description: "Project description" },
       },
-      run({ args }) {
-        const obsxa = open(args.db);
+      async run({ args }) {
+        const obsxa = await open(args.db);
         try {
-          const project = obsxa.project.add({
+          const project = await obsxa.project.add({
             id: args.id,
             name: args.name,
             description: args.description,
@@ -24,17 +24,17 @@ export default defineCommand({
           if (args.toon || args.json) return output(project, args.toon);
           consola.success(`Project "${project.id}" created: ${project.name}`);
         } finally {
-          obsxa.close();
+          await obsxa.close();
         }
       },
     }),
     list: defineCommand({
       meta: { name: "list", description: "List projects" },
       args: dbArgs,
-      run({ args }) {
-        const obsxa = open(args.db);
+      async run({ args }) {
+        const obsxa = await open(args.db);
         try {
-          const projects = obsxa.project.list();
+          const projects = await obsxa.project.list();
           if (args.toon || args.json) return output(projects, args.toon);
           if (projects.length === 0) return consola.info("No projects found.");
           for (const project of projects) {
@@ -43,7 +43,7 @@ export default defineCommand({
             );
           }
         } finally {
-          obsxa.close();
+          await obsxa.close();
         }
       },
     }),

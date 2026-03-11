@@ -42,8 +42,8 @@ function toTransition(row: typeof observationStatusEvents.$inferSelect): Observa
 
 export function createObservationStore(db: ObsxaDB) {
   return {
-    add(input: AddObservation): Observation {
-      const project = db
+    async add(input: AddObservation): Promise<Observation> {
+      const project = await db
         .select({ id: projects.id })
         .from(projects)
         .where(eq(projects.id, input.projectId))
@@ -62,7 +62,7 @@ export function createObservationStore(db: ObsxaDB) {
         frequency: 1,
       });
 
-      const row = db
+      const row = await db
         .insert(observations)
         .values({
           projectId: input.projectId,
@@ -91,85 +91,97 @@ export function createObservationStore(db: ObsxaDB) {
       return toObservation(row);
     },
 
-    addMany(records: ObservationImportRecord[]): Observation[] {
-      return records.map((record) => {
+    async addMany(records: ObservationImportRecord[]): Promise<Observation[]> {
+      const results: Observation[] = [];
+      for (const record of records) {
         if (record.status === "promoted" && !record.promotedTo) {
           throw new Error("Imported promoted observations must include promotedTo");
         }
-        const created = this.add(record);
+        const created = await this.add(record);
         if (record.status === "dismissed") {
-          return this.dismiss(created.id, {
-            reasonCode: "manual_review",
-            reasonNote: "Imported as dismissed",
-          });
+          results.push(
+            await this.dismiss(created.id, {
+              reasonCode: "manual_review",
+              reasonNote: "Imported as dismissed",
+            }),
+          );
+          continue;
         }
         if (record.status === "archived") {
-          return this.archive(created.id, {
-            reasonCode: "manual_review",
-            reasonNote: "Imported as archived",
-          });
+          results.push(
+            await this.archive(created.id, {
+              reasonCode: "manual_review",
+              reasonNote: "Imported as archived",
+            }),
+          );
+          continue;
         }
         if (record.status === "promoted") {
-          return this.promote(created.id, record.promotedTo!);
+          results.push(await this.promote(created.id, record.promotedTo!));
+          continue;
         }
-        return created;
-      });
+        results.push(created);
+      }
+      return results;
     },
 
-    get(id: number): Observation | null {
-      const row = db.select().from(observations).where(eq(observations.id, id)).get();
+    async get(id: number): Promise<Observation | null> {
+      const row = await db.select().from(observations).where(eq(observations.id, id)).get();
       return row ? toObservation(row) : null;
     },
 
-    list(
+    async list(
       projectId: string,
       opts?: {
         status?: ObservationStatus;
         type?: ObservationType;
         sourceType?: SourceType;
       },
-    ): Observation[] {
+    ): Promise<Observation[]> {
       const conditions = [eq(observations.projectId, projectId)];
       if (opts?.status) conditions.push(eq(observations.status, opts.status));
       if (opts?.type) conditions.push(eq(observations.type, opts.type));
       if (opts?.sourceType) conditions.push(eq(observations.sourceType, opts.sourceType));
-      return db
-        .select()
-        .from(observations)
-        .where(and(...conditions))
-        .all()
-        .map(toObservation);
+      return (
+        await db
+          .select()
+          .from(observations)
+          .where(and(...conditions))
+          .all()
+      ).map(toObservation);
     },
 
-    transitions(observationId: number): ObservationTransition[] {
-      return db
-        .select()
-        .from(observationStatusEvents)
-        .where(eq(observationStatusEvents.observationId, observationId))
-        .orderBy(asc(observationStatusEvents.createdAt), asc(observationStatusEvents.id))
-        .all()
-        .map(toTransition);
+    async transitions(observationId: number): Promise<ObservationTransition[]> {
+      return (
+        await db
+          .select()
+          .from(observationStatusEvents)
+          .where(eq(observationStatusEvents.observationId, observationId))
+          .orderBy(asc(observationStatusEvents.createdAt), asc(observationStatusEvents.id))
+          .all()
+      ).map(toTransition);
     },
 
-    edits(observationId: number): ObservationEdit[] {
-      return db
-        .select()
-        .from(observationEdits)
-        .where(eq(observationEdits.observationId, observationId))
-        .orderBy(asc(observationEdits.createdAt), asc(observationEdits.id))
-        .all()
-        .map((row) => ({
-          id: row.id,
-          observationId: row.observationId,
-          field: row.field,
-          oldValue: row.oldValue,
-          newValue: row.newValue,
-          createdAt: row.createdAt,
-        }));
+    async edits(observationId: number): Promise<ObservationEdit[]> {
+      return (
+        await db
+          .select()
+          .from(observationEdits)
+          .where(eq(observationEdits.observationId, observationId))
+          .orderBy(asc(observationEdits.createdAt), asc(observationEdits.id))
+          .all()
+      ).map((row) => ({
+        id: row.id,
+        observationId: row.observationId,
+        field: row.field,
+        oldValue: row.oldValue,
+        newValue: row.newValue,
+        createdAt: row.createdAt,
+      }));
     },
 
-    update(id: number, fields: UpdateObservation): Observation {
-      const current = db.select().from(observations).where(eq(observations.id, id)).get();
+    async update(id: number, fields: UpdateObservation): Promise<Observation> {
+      const current = await db.select().from(observations).where(eq(observations.id, id)).get();
       if (!current) throw new Error(`Observation #${id} not found`);
 
       const values: Record<string, unknown> = { updatedAt: new Date() };
@@ -269,8 +281,8 @@ export function createObservationStore(db: ObsxaDB) {
         frequency: current.frequency,
       });
 
-      return db.transaction((tx) => {
-        const row = tx
+      return db.transaction(async (tx) => {
+        const row = await tx
           .update(observations)
           .set(values)
           .where(eq(observations.id, id))
@@ -278,7 +290,8 @@ export function createObservationStore(db: ObsxaDB) {
           .get();
 
         for (const edit of editRecords) {
-          tx.insert(observationEdits)
+          await tx
+            .insert(observationEdits)
             .values({
               observationId: id,
               field: edit.field,
@@ -292,15 +305,17 @@ export function createObservationStore(db: ObsxaDB) {
       });
     },
 
-    updateMany(records: ObservationBatchUpdateRecord[]): Observation[] {
-      return records.map((record) => {
+    async updateMany(records: ObservationBatchUpdateRecord[]): Promise<Observation[]> {
+      const updated: Observation[] = [];
+      for (const record of records) {
         const { id, ...fields } = record;
-        return this.update(id, fields);
-      });
+        updated.push(await this.update(id, fields));
+      }
+      return updated;
     },
 
-    dismiss(id: number, transition: TransitionObservation): Observation {
-      const existing = db.select().from(observations).where(eq(observations.id, id)).get();
+    async dismiss(id: number, transition: TransitionObservation): Promise<Observation> {
+      const existing = await db.select().from(observations).where(eq(observations.id, id)).get();
       if (!existing) throw new Error(`Observation #${id} not found`);
       if (existing.status !== "active") {
         throw new Error(
@@ -308,8 +323,8 @@ export function createObservationStore(db: ObsxaDB) {
         );
       }
 
-      return db.transaction((tx) => {
-        const row = tx
+      return db.transaction(async (tx) => {
+        const row = await tx
           .update(observations)
           .set({
             status: "dismissed",
@@ -321,7 +336,8 @@ export function createObservationStore(db: ObsxaDB) {
           .returning()
           .get();
 
-        tx.insert(observationStatusEvents)
+        await tx
+          .insert(observationStatusEvents)
           .values({
             observationId: id,
             fromStatus: existing.status,
@@ -335,8 +351,8 @@ export function createObservationStore(db: ObsxaDB) {
       });
     },
 
-    archive(id: number, transition: TransitionObservation): Observation {
-      const existing = db.select().from(observations).where(eq(observations.id, id)).get();
+    async archive(id: number, transition: TransitionObservation): Promise<Observation> {
+      const existing = await db.select().from(observations).where(eq(observations.id, id)).get();
       if (!existing) throw new Error(`Observation #${id} not found`);
       if (existing.status !== "active") {
         throw new Error(
@@ -344,8 +360,8 @@ export function createObservationStore(db: ObsxaDB) {
         );
       }
 
-      return db.transaction((tx) => {
-        const row = tx
+      return db.transaction(async (tx) => {
+        const row = await tx
           .update(observations)
           .set({
             status: "archived",
@@ -357,7 +373,8 @@ export function createObservationStore(db: ObsxaDB) {
           .returning()
           .get();
 
-        tx.insert(observationStatusEvents)
+        await tx
+          .insert(observationStatusEvents)
           .values({
             observationId: id,
             fromStatus: existing.status,
@@ -371,8 +388,8 @@ export function createObservationStore(db: ObsxaDB) {
       });
     },
 
-    incrementFrequency(id: number): Observation {
-      const existing = db.select().from(observations).where(eq(observations.id, id)).get();
+    async incrementFrequency(id: number): Promise<Observation> {
+      const existing = await db.select().from(observations).where(eq(observations.id, id)).get();
       if (!existing) throw new Error(`Observation #${id} not found`);
 
       const frequency = existing.frequency + 1;
@@ -384,7 +401,7 @@ export function createObservationStore(db: ObsxaDB) {
         frequency,
       });
 
-      const row = db
+      const row = await db
         .update(observations)
         .set({ frequency, triageScore, updatedAt: new Date() })
         .where(eq(observations.id, id))
@@ -393,8 +410,8 @@ export function createObservationStore(db: ObsxaDB) {
       return toObservation(row);
     },
 
-    promote(id: number, hypothesisRef: string): Observation {
-      const existing = db.select().from(observations).where(eq(observations.id, id)).get();
+    async promote(id: number, hypothesisRef: string): Promise<Observation> {
+      const existing = await db.select().from(observations).where(eq(observations.id, id)).get();
       if (!existing) throw new Error(`Observation #${id} not found`);
       if (existing.status !== "active") {
         throw new Error(
@@ -402,8 +419,8 @@ export function createObservationStore(db: ObsxaDB) {
         );
       }
 
-      return db.transaction((tx) => {
-        const row = tx
+      return db.transaction(async (tx) => {
+        const row = await tx
           .update(observations)
           .set({
             status: "promoted",
@@ -416,7 +433,8 @@ export function createObservationStore(db: ObsxaDB) {
           .returning()
           .get();
 
-        tx.insert(observationStatusEvents)
+        await tx
+          .insert(observationStatusEvents)
           .values({
             observationId: id,
             fromStatus: existing.status,

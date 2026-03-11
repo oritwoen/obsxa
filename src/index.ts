@@ -1,9 +1,9 @@
 import { existsSync, mkdirSync, statSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
-import { migrate } from "drizzle-orm/better-sqlite3/migrator";
+import { createClient, type Client } from "@libsql/client/node";
+import { drizzle } from "drizzle-orm/libsql/node";
+import { migrate } from "drizzle-orm/libsql/migrator";
 import { createAnalysisStore } from "./core/analysis.ts";
 import { createClusterStore } from "./core/cluster.ts";
 import { createDedupStore } from "./core/dedup.ts";
@@ -12,6 +12,7 @@ import { createProjectStore } from "./core/project.ts";
 import { createRelationStore } from "./core/relation.ts";
 import { createSearchStore } from "./core/search.ts";
 import { backupDatabase } from "./backup.ts";
+import type { ObsxaDB } from "./core/db.ts";
 import type { ObsxaOptions } from "./types.ts";
 
 const SCHEMA_VERSION = 1;
@@ -67,8 +68,8 @@ function findMigrationsFolder(): string {
   throw new Error("Cannot find drizzle migrations folder");
 }
 
-function ensureMetaTable(sqlite: Database.Database): void {
-  sqlite.exec(`
+async function ensureMetaTable(client: Client): Promise<void> {
+  await client.execute(`
     CREATE TABLE IF NOT EXISTS obsxa_meta (
       key TEXT PRIMARY KEY NOT NULL,
       value TEXT NOT NULL,
@@ -77,23 +78,24 @@ function ensureMetaTable(sqlite: Database.Database): void {
   `);
 }
 
-function getSchemaVersion(sqlite: Database.Database): number | null {
-  const row = sqlite.prepare("SELECT value FROM obsxa_meta WHERE key = ?").get("schema_version") as
-    | { value?: string }
-    | undefined;
+async function getSchemaVersion(client: Client): Promise<number | null> {
+  const result = await client.execute({
+    sql: "SELECT value FROM obsxa_meta WHERE key = ?",
+    args: ["schema_version"],
+  });
+  const row = result.rows[0] as { value?: unknown } | undefined;
   if (!row?.value) return null;
-  const parsed = Number.parseInt(row.value, 10);
+  const parsed = Number.parseInt(String(row.value), 10);
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function setSchemaVersion(sqlite: Database.Database, version: number): void {
-  sqlite
-    .prepare(
-      `INSERT INTO obsxa_meta (key, value, updated_at)
+async function setSchemaVersion(client: Client, version: number): Promise<void> {
+  await client.execute({
+    sql: `INSERT INTO obsxa_meta (key, value, updated_at)
      VALUES (?, ?, strftime('%s', 'now'))
      ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`,
-    )
-    .run("schema_version", String(version));
+    args: ["schema_version", String(version)],
+  });
 }
 
 function shouldBackup(dbPath: string, autoBackup: boolean): boolean {
@@ -117,52 +119,55 @@ function makeBackupPath(dbPath: string, backupDir?: string): string {
   return `${dbPath}.bak.${stamp}`;
 }
 
-const CUSTOM_SQL = `
-CREATE INDEX IF NOT EXISTS idx_observations_project ON observations(project_id);
-CREATE INDEX IF NOT EXISTS idx_observations_status ON observations(status);
-CREATE INDEX IF NOT EXISTS idx_observations_type ON observations(type);
-CREATE INDEX IF NOT EXISTS idx_observations_source_type ON observations(source_type);
-CREATE INDEX IF NOT EXISTS idx_observations_triage ON observations(triage_score);
-CREATE INDEX IF NOT EXISTS idx_rel_from ON observation_relations(from_observation_id);
-CREATE INDEX IF NOT EXISTS idx_rel_to ON observation_relations(to_observation_id);
-CREATE INDEX IF NOT EXISTS idx_rel_type ON observation_relations(type);
-CREATE INDEX IF NOT EXISTS idx_observation_status_events_observation ON observation_status_events(observation_id);
-CREATE INDEX IF NOT EXISTS idx_clusters_project ON clusters(project_id);
-CREATE INDEX IF NOT EXISTS idx_cluster_members_cluster ON cluster_members(cluster_id);
-CREATE INDEX IF NOT EXISTS idx_cluster_members_observation ON cluster_members(observation_id);
-CREATE INDEX IF NOT EXISTS idx_duplicate_candidates_project ON duplicate_candidates(project_id);
-CREATE INDEX IF NOT EXISTS idx_duplicate_candidates_status ON duplicate_candidates(status);
-CREATE INDEX IF NOT EXISTS idx_duplicate_candidate_events_candidate ON duplicate_candidate_events(candidate_id);
-CREATE INDEX IF NOT EXISTS idx_observation_merges_project ON observation_merges(project_id);
-CREATE INDEX IF NOT EXISTS idx_observation_edits_observation ON observation_edits(observation_id);
-`;
+function toLibsqlUrl(dbPath: string): string {
+  if (dbPath === ":memory:") return dbPath;
+  if (/^(?:file:|libsql:|https?:|wss?:)/.test(dbPath)) return dbPath;
+  return `file:${dbPath}`;
+}
 
-const FTS_SQL = `
-CREATE VIRTUAL TABLE IF NOT EXISTS observations_fts USING fts5(
-  title,
-  description,
-  tags,
-  content='observations',
-  content_rowid='id'
-);
+const CUSTOM_SQL = [
+  "CREATE INDEX IF NOT EXISTS idx_observations_project ON observations(project_id)",
+  "CREATE INDEX IF NOT EXISTS idx_observations_status ON observations(status)",
+  "CREATE INDEX IF NOT EXISTS idx_observations_type ON observations(type)",
+  "CREATE INDEX IF NOT EXISTS idx_observations_source_type ON observations(source_type)",
+  "CREATE INDEX IF NOT EXISTS idx_observations_triage ON observations(triage_score)",
+  "CREATE INDEX IF NOT EXISTS idx_rel_from ON observation_relations(from_observation_id)",
+  "CREATE INDEX IF NOT EXISTS idx_rel_to ON observation_relations(to_observation_id)",
+  "CREATE INDEX IF NOT EXISTS idx_rel_type ON observation_relations(type)",
+  "CREATE INDEX IF NOT EXISTS idx_observation_status_events_observation ON observation_status_events(observation_id)",
+  "CREATE INDEX IF NOT EXISTS idx_clusters_project ON clusters(project_id)",
+  "CREATE INDEX IF NOT EXISTS idx_cluster_members_cluster ON cluster_members(cluster_id)",
+  "CREATE INDEX IF NOT EXISTS idx_cluster_members_observation ON cluster_members(observation_id)",
+  "CREATE INDEX IF NOT EXISTS idx_duplicate_candidates_project ON duplicate_candidates(project_id)",
+  "CREATE INDEX IF NOT EXISTS idx_duplicate_candidates_status ON duplicate_candidates(status)",
+  "CREATE INDEX IF NOT EXISTS idx_duplicate_candidate_events_candidate ON duplicate_candidate_events(candidate_id)",
+  "CREATE INDEX IF NOT EXISTS idx_observation_merges_project ON observation_merges(project_id)",
+  "CREATE INDEX IF NOT EXISTS idx_observation_edits_observation ON observation_edits(observation_id)",
+];
 
-CREATE TRIGGER IF NOT EXISTS observations_fts_ai AFTER INSERT ON observations BEGIN
-  INSERT INTO observations_fts(rowid, title, description, tags)
-  VALUES (NEW.id, NEW.title, NEW.description, NEW.tags);
-END;
-
-CREATE TRIGGER IF NOT EXISTS observations_fts_ad AFTER DELETE ON observations BEGIN
-  INSERT INTO observations_fts(observations_fts, rowid, title, description, tags)
-  VALUES('delete', OLD.id, OLD.title, OLD.description, OLD.tags);
-END;
-
-CREATE TRIGGER IF NOT EXISTS observations_fts_au AFTER UPDATE ON observations BEGIN
-  INSERT INTO observations_fts(observations_fts, rowid, title, description, tags)
-  VALUES('delete', OLD.id, OLD.title, OLD.description, OLD.tags);
-  INSERT INTO observations_fts(rowid, title, description, tags)
-  VALUES (NEW.id, NEW.title, NEW.description, NEW.tags);
-END;
-`;
+const FTS_SQL = [
+  `CREATE VIRTUAL TABLE IF NOT EXISTS observations_fts USING fts5(
+    title,
+    description,
+    tags,
+    content='observations',
+    content_rowid='id'
+  )`,
+  `CREATE TRIGGER IF NOT EXISTS observations_fts_ai AFTER INSERT ON observations BEGIN
+    INSERT INTO observations_fts(rowid, title, description, tags)
+    VALUES (NEW.id, NEW.title, NEW.description, NEW.tags);
+  END`,
+  `CREATE TRIGGER IF NOT EXISTS observations_fts_ad AFTER DELETE ON observations BEGIN
+    INSERT INTO observations_fts(observations_fts, rowid, title, description, tags)
+    VALUES('delete', OLD.id, OLD.title, OLD.description, OLD.tags);
+  END`,
+  `CREATE TRIGGER IF NOT EXISTS observations_fts_au AFTER UPDATE ON observations BEGIN
+    INSERT INTO observations_fts(observations_fts, rowid, title, description, tags)
+    VALUES('delete', OLD.id, OLD.title, OLD.description, OLD.tags);
+    INSERT INTO observations_fts(rowid, title, description, tags)
+    VALUES (NEW.id, NEW.title, NEW.description, NEW.tags);
+  END`,
+];
 
 /** Observation database instance with all store modules attached. Call `.close()` when done. */
 export interface ObsxaInstance {
@@ -173,7 +178,7 @@ export interface ObsxaInstance {
   dedup: ReturnType<typeof createDedupStore>;
   search: ReturnType<typeof createSearchStore>;
   analysis: ReturnType<typeof createAnalysisStore>;
-  close(): void;
+  close(): Promise<void>;
 }
 
 /**
@@ -184,24 +189,30 @@ export interface ObsxaInstance {
  *
  * @example
  * ```ts
- * const obsxa = createObsxa({ db: './research.db' })
- * obsxa.observation.add({ projectId: 'my-project', title: 'Pattern found', source: 'scan' })
- * obsxa.close()
+ * const obsxa = await createObsxa({ db: './research.db' })
+ * await obsxa.observation.add({ projectId: 'my-project', title: 'Pattern found', source: 'scan' })
+ * await obsxa.close()
  * ```
  */
-export function createObsxa(options: ObsxaOptions = { db: "./obsxa.db" }): ObsxaInstance {
+export async function createObsxa(
+  options: ObsxaOptions = { db: "./obsxa.db" },
+): Promise<ObsxaInstance> {
   const resolved = {
     autoMigrate: options.autoMigrate ?? true,
     autoBackup: options.autoBackup ?? true,
     backupDir: options.backupDir,
   };
 
-  const sqlite = new Database(options.db);
-  sqlite.pragma("journal_mode = WAL");
-  sqlite.pragma("foreign_keys = ON");
+  const client = createClient({ url: toLibsqlUrl(options.db) });
+  try {
+    await client.execute("PRAGMA journal_mode = WAL");
+  } catch {}
+  try {
+    await client.execute("PRAGMA foreign_keys = ON");
+  } catch {}
 
-  ensureMetaTable(sqlite);
-  const beforeVersion = getSchemaVersion(sqlite);
+  await ensureMetaTable(client);
+  const beforeVersion = await getSchemaVersion(client);
   if (beforeVersion !== null && beforeVersion > SCHEMA_VERSION) {
     throw new Error(
       `Database schema version ${beforeVersion} is newer than supported ${SCHEMA_VERSION}. Upgrade obsxa package.`,
@@ -220,15 +231,19 @@ export function createObsxa(options: ObsxaOptions = { db: "./obsxa.db" }): Obsxa
     backupDatabase(options.db, backupPath);
   }
 
-  const db = drizzle(sqlite);
+  const db: ObsxaDB = drizzle({ client });
   if (needsMigration) {
-    migrate(db, { migrationsFolder: findMigrationsFolder() });
-    setSchemaVersion(sqlite, SCHEMA_VERSION);
+    await migrate(db, { migrationsFolder: findMigrationsFolder() });
+    await setSchemaVersion(client, SCHEMA_VERSION);
   }
 
-  sqlite.exec(CUSTOM_SQL);
+  for (const statement of CUSTOM_SQL) {
+    await client.execute(statement);
+  }
   try {
-    sqlite.exec(FTS_SQL);
+    for (const statement of FTS_SQL) {
+      await client.execute(statement);
+    }
   } catch {}
 
   return {
@@ -237,11 +252,11 @@ export function createObsxa(options: ObsxaOptions = { db: "./obsxa.db" }): Obsxa
     relation: createRelationStore(db),
     cluster: createClusterStore(db),
     dedup: createDedupStore(db),
-    search: createSearchStore(sqlite),
+    search: createSearchStore(client),
     analysis: createAnalysisStore(db),
 
-    close() {
-      sqlite.close();
+    async close() {
+      client.close();
     },
   };
 }

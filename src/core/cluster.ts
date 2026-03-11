@@ -25,15 +25,15 @@ function toClusterMember(row: typeof clusterMembers.$inferSelect): ClusterMember
 
 export function createClusterStore(db: ObsxaDB) {
   return {
-    add(input: AddCluster): Cluster {
-      const project = db
+    async add(input: AddCluster): Promise<Cluster> {
+      const project = await db
         .select({ id: projects.id })
         .from(projects)
         .where(eq(projects.id, input.projectId))
         .get();
       if (!project) throw new Error(`Project "${input.projectId}" not found`);
 
-      const row = db
+      const row = await db
         .insert(clusters)
         .values({
           projectId: input.projectId,
@@ -46,29 +46,26 @@ export function createClusterStore(db: ObsxaDB) {
       return toCluster(row);
     },
 
-    list(projectId: string): Cluster[] {
-      return db
-        .select()
-        .from(clusters)
-        .where(eq(clusters.projectId, projectId))
-        .all()
-        .map(toCluster);
+    async list(projectId: string): Promise<Cluster[]> {
+      return (await db.select().from(clusters).where(eq(clusters.projectId, projectId)).all()).map(
+        toCluster,
+      );
     },
 
-    get(id: number): Cluster | null {
-      const row = db.select().from(clusters).where(eq(clusters.id, id)).get();
+    async get(id: number): Promise<Cluster | null> {
+      const row = await db.select().from(clusters).where(eq(clusters.id, id)).get();
       return row ? toCluster(row) : null;
     },
 
-    addMember(clusterId: number, observationId: number): ClusterMember {
-      const cluster = db
+    async addMember(clusterId: number, observationId: number): Promise<ClusterMember> {
+      const cluster = await db
         .select({ id: clusters.id, projectId: clusters.projectId })
         .from(clusters)
         .where(eq(clusters.id, clusterId))
         .get();
       if (!cluster) throw new Error(`Cluster #${clusterId} not found`);
 
-      const observation = db
+      const observation = await db
         .select({ id: observations.id, projectId: observations.projectId })
         .from(observations)
         .where(eq(observations.id, observationId))
@@ -81,7 +78,7 @@ export function createClusterStore(db: ObsxaDB) {
         );
       }
 
-      const existing = db
+      const existing = await db
         .select()
         .from(clusterMembers)
         .where(
@@ -93,12 +90,16 @@ export function createClusterStore(db: ObsxaDB) {
         .get();
       if (existing) return toClusterMember(existing);
 
-      const row = db.insert(clusterMembers).values({ clusterId, observationId }).returning().get();
+      const row = await db
+        .insert(clusterMembers)
+        .values({ clusterId, observationId })
+        .returning()
+        .get();
       return toClusterMember(row);
     },
 
-    listMembers(clusterId: number): Observation[] {
-      const rows = db
+    async listMembers(clusterId: number): Promise<Observation[]> {
+      const rows = await db
         .select({ observation: observations })
         .from(clusterMembers)
         .innerJoin(observations, eq(clusterMembers.observationId, observations.id))
@@ -108,8 +109,8 @@ export function createClusterStore(db: ObsxaDB) {
       return rows.map((row) => toObservation(row.observation));
     },
 
-    removeMember(memberId: number): void {
-      db.delete(clusterMembers).where(eq(clusterMembers.id, memberId)).run();
+    async removeMember(memberId: number): Promise<void> {
+      await db.delete(clusterMembers).where(eq(clusterMembers.id, memberId)).run();
     },
   };
 }

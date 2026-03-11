@@ -55,7 +55,7 @@ pnpm add ai zod
 ```ts
 import { createObsxa } from "obsxa";
 
-const obsxa = createObsxa({ db: "./research.db" });
+const obsxa = await createObsxa({ db: "./research.db" });
 
 // Create a project
 obsxa.project.add({ id: "sensor-data", name: "Sensor Analysis" });
@@ -109,7 +109,7 @@ const isolated = obsxa.analysis.isolated("sensor-data"); // observations with no
 const convergent = obsxa.analysis.convergent("sensor-data"); // confirmed by multiple sources
 const stats = obsxa.analysis.stats("sensor-data"); // project-level summary
 
-obsxa.close();
+await obsxa.close();
 ```
 
 ### CLI
@@ -415,7 +415,7 @@ pnpm test:run    # vitest --run
 You can configure startup behavior:
 
 ```ts
-createObsxa({
+await createObsxa({
   db: "./obsxa.db",
   autoMigrate: true, // default
   autoBackup: true, // default

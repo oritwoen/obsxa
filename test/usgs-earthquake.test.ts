@@ -252,21 +252,21 @@ describe("usgs earthquake integration", () => {
   let dbPath: string;
   let obsxa: ObsxaInstance;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     dbDir = mkdtempSync(join(tmpdir(), "obsxa-usgs-"));
     dbPath = join(dbDir, "seismic.db");
-    obsxa = createObsxa({ db: dbPath });
+    obsxa = await createObsxa({ db: dbPath });
   });
 
-  afterEach(() => {
-    obsxa.close();
+  afterEach(async () => {
+    await obsxa.close();
     rmSync(dbDir, { recursive: true, force: true });
   });
 
-  it("ingests 14 earthquakes as observations", () => {
-    obsxa.project.add({ id: "seismic", name: "USGS Seismic Monitor" });
+  it("ingests 14 earthquakes as observations", async () => {
+    await obsxa.project.add({ id: "seismic", name: "USGS Seismic Monitor" });
 
-    const observations = obsxa.observation.addMany(
+    const observations = await obsxa.observation.addMany(
       EARTHQUAKES.map((eq) => ({
         projectId: "seismic",
         title: `M ${eq.mag} - ${eq.place}`,
@@ -307,10 +307,10 @@ describe("usgs earthquake integration", () => {
     expect(observations.every((o) => o.capturedAt instanceof Date)).toBe(true);
   });
 
-  it("creates regional clusters and adds members", () => {
-    obsxa.project.add({ id: "seismic", name: "USGS Seismic Monitor" });
+  it("creates regional clusters and adds members", async () => {
+    await obsxa.project.add({ id: "seismic", name: "USGS Seismic Monitor" });
 
-    const added = obsxa.observation.addMany(
+    const added = await obsxa.observation.addMany(
       EARTHQUAKES.map((eq) => ({
         projectId: "seismic",
         title: `M ${eq.mag} - ${eq.place}`,
@@ -322,7 +322,6 @@ describe("usgs earthquake integration", () => {
       })),
     );
 
-    // Build region → observation ids map
     const regionObs = new Map<string, number[]>();
     for (let i = 0; i < EARTHQUAKES.length; i++) {
       const region = regionKey(EARTHQUAKES[i]!.place);
@@ -331,25 +330,24 @@ describe("usgs earthquake integration", () => {
       regionObs.set(region, ids);
     }
 
-    // Create clusters only for regions with 2+ quakes
     const clustered = [...regionObs.entries()].filter(([, ids]) => ids.length >= 2);
-    expect(clustered.length).toBe(4); // japan, alaska, kamchatka, indonesia
+    expect(clustered.length).toBe(4);
 
     for (const [region, ids] of clustered) {
-      const cluster = obsxa.cluster.add({ projectId: "seismic", name: `Region: ${region}` });
+      const cluster = await obsxa.cluster.add({ projectId: "seismic", name: `Region: ${region}` });
       for (const id of ids) {
-        obsxa.cluster.addMember(cluster.id, id);
+        await obsxa.cluster.addMember(cluster.id, id);
       }
-      expect(obsxa.cluster.listMembers(cluster.id)).toHaveLength(ids.length);
+      expect(await obsxa.cluster.listMembers(cluster.id)).toHaveLength(ids.length);
     }
 
-    expect(obsxa.cluster.list("seismic")).toHaveLength(4);
+    expect(await obsxa.cluster.list("seismic")).toHaveLength(4);
   });
 
-  it("creates relations between earthquakes in same region", () => {
-    obsxa.project.add({ id: "seismic", name: "USGS Seismic Monitor" });
+  it("creates relations between earthquakes in same region", async () => {
+    await obsxa.project.add({ id: "seismic", name: "USGS Seismic Monitor" });
 
-    const added = obsxa.observation.addMany(
+    const added = await obsxa.observation.addMany(
       EARTHQUAKES.map((eq) => ({
         projectId: "seismic",
         title: `M ${eq.mag} - ${eq.place}`,
@@ -361,16 +359,15 @@ describe("usgs earthquake integration", () => {
       })),
     );
 
-    // Japan cluster: 3 quakes near Hirara — same_signal_as
     const japan = added.slice(0, 3);
-    obsxa.relation.add({
+    await obsxa.relation.add({
       fromObservationId: japan[1]!.id,
       toObservationId: japan[0]!.id,
       type: "same_signal_as",
       confidence: 90,
       notes: "Aftershock sequence near Hirara",
     });
-    obsxa.relation.add({
+    await obsxa.relation.add({
       fromObservationId: japan[2]!.id,
       toObservationId: japan[0]!.id,
       type: "same_signal_as",
@@ -378,39 +375,37 @@ describe("usgs earthquake integration", () => {
       notes: "Same fault system",
     });
 
-    // Alaska cluster: 3 quakes near Attu — supports
     const alaska = added.slice(3, 6);
-    obsxa.relation.add({
+    await obsxa.relation.add({
       fromObservationId: alaska[1]!.id,
       toObservationId: alaska[0]!.id,
       type: "supports",
       confidence: 80,
     });
-    obsxa.relation.add({
+    await obsxa.relation.add({
       fromObservationId: alaska[2]!.id,
       toObservationId: alaska[0]!.id,
       type: "supports",
       confidence: 75,
     });
 
-    // Italy M6.0 contradicts the Chile deep quake (different mechanism)
-    const italy = added[11]!; // M6.0 shallow
-    const chile = added[13]!; // M5.1 deep
-    obsxa.relation.add({
+    const italy = added[11]!;
+    const chile = added[13]!;
+    await obsxa.relation.add({
       fromObservationId: italy.id,
       toObservationId: chile.id,
       type: "contradicts",
       notes: "Shallow crustal vs deep subduction",
     });
 
-    const japanRels = obsxa.relation.list(japan[0]!.id);
+    const japanRels = await obsxa.relation.list(japan[0]!.id);
     expect(japanRels).toHaveLength(2);
     expect(japanRels.every((r) => r.type === "same_signal_as")).toBe(true);
   });
 
-  it("analysis: stats reflect ingested data", () => {
-    obsxa.project.add({ id: "seismic", name: "USGS Seismic Monitor" });
-    obsxa.observation.addMany(
+  it("analysis: stats reflect ingested data", async () => {
+    await obsxa.project.add({ id: "seismic", name: "USGS Seismic Monitor" });
+    await obsxa.observation.addMany(
       EARTHQUAKES.map((eq) => ({
         projectId: "seismic",
         title: `M ${eq.mag} - ${eq.place}`,
@@ -421,7 +416,7 @@ describe("usgs earthquake integration", () => {
       })),
     );
 
-    const stats = obsxa.analysis.stats("seismic");
+    const stats = await obsxa.analysis.stats("seismic");
     expect(stats.total).toBe(14);
     expect(stats.active).toBe(14);
     expect(stats.promoted).toBe(0);
@@ -431,10 +426,10 @@ describe("usgs earthquake integration", () => {
     expect(stats.avgConfidence).toBeLessThanOrEqual(100);
   });
 
-  it("analysis: convergent detects multi-source support", () => {
-    obsxa.project.add({ id: "seismic", name: "USGS Seismic Monitor" });
+  it("analysis: convergent detects multi-source support", async () => {
+    await obsxa.project.add({ id: "seismic", name: "USGS Seismic Monitor" });
 
-    const added = obsxa.observation.addMany(
+    const added = await obsxa.observation.addMany(
       EARTHQUAKES.map((eq) => ({
         projectId: "seismic",
         title: `M ${eq.mag} - ${eq.place}`,
@@ -445,26 +440,25 @@ describe("usgs earthquake integration", () => {
       })),
     );
 
-    // Alaska[0] supported by two different sources
-    obsxa.relation.add({
+    await obsxa.relation.add({
       fromObservationId: added[4]!.id,
       toObservationId: added[3]!.id,
       type: "supports",
     });
-    obsxa.relation.add({
+    await obsxa.relation.add({
       fromObservationId: added[5]!.id,
       toObservationId: added[3]!.id,
       type: "supports",
     });
 
-    const convergent = obsxa.analysis.convergent("seismic");
+    const convergent = await obsxa.analysis.convergent("seismic");
     expect(convergent.map((o) => o.id)).toContain(added[3]!.id);
   });
 
-  it("analysis: isolated finds standalone quakes", () => {
-    obsxa.project.add({ id: "seismic", name: "USGS Seismic Monitor" });
+  it("analysis: isolated finds standalone quakes", async () => {
+    await obsxa.project.add({ id: "seismic", name: "USGS Seismic Monitor" });
 
-    const added = obsxa.observation.addMany(
+    const added = await obsxa.observation.addMany(
       EARTHQUAKES.map((eq) => ({
         projectId: "seismic",
         title: `M ${eq.mag} - ${eq.place}`,
@@ -475,30 +469,27 @@ describe("usgs earthquake integration", () => {
       })),
     );
 
-    // Link Japan cluster only
-    obsxa.relation.add({
+    await obsxa.relation.add({
       fromObservationId: added[1]!.id,
       toObservationId: added[0]!.id,
       type: "same_signal_as",
     });
-    obsxa.relation.add({
+    await obsxa.relation.add({
       fromObservationId: added[2]!.id,
       toObservationId: added[0]!.id,
       type: "same_signal_as",
     });
 
-    const isolated = obsxa.analysis.isolated("seismic");
-    // 14 total minus 3 linked = 11 isolated
+    const isolated = await obsxa.analysis.isolated("seismic");
     expect(isolated).toHaveLength(11);
-    // Japan quakes should NOT be isolated
     expect(isolated.map((o) => o.id)).not.toContain(added[0]!.id);
     expect(isolated.map((o) => o.id)).not.toContain(added[1]!.id);
     expect(isolated.map((o) => o.id)).not.toContain(added[2]!.id);
   });
 
-  it("analysis: triage ranks high-magnitude quakes first", () => {
-    obsxa.project.add({ id: "seismic", name: "USGS Seismic Monitor" });
-    obsxa.observation.addMany(
+  it("analysis: triage ranks high-magnitude quakes first", async () => {
+    await obsxa.project.add({ id: "seismic", name: "USGS Seismic Monitor" });
+    await obsxa.observation.addMany(
       EARTHQUAKES.map((eq) => ({
         projectId: "seismic",
         title: `M ${eq.mag} - ${eq.place}`,
@@ -512,7 +503,7 @@ describe("usgs earthquake integration", () => {
       })),
     );
 
-    const triaged = obsxa.analysis.triage("seismic", 5, "triage");
+    const triaged = await obsxa.analysis.triage("seismic", 5, "triage");
     expect(triaged).toHaveLength(5);
     const topTitles = triaged.slice(0, 2).map((t) => t.observation.title);
     expect(topTitles.some((t) => t.startsWith("M 6"))).toBe(true);
@@ -521,9 +512,9 @@ describe("usgs earthquake integration", () => {
     }
   });
 
-  it("analysis: frequent detects bumped quakes", () => {
-    obsxa.project.add({ id: "seismic", name: "USGS Seismic Monitor" });
-    const added = obsxa.observation.addMany(
+  it("analysis: frequent detects bumped quakes", async () => {
+    await obsxa.project.add({ id: "seismic", name: "USGS Seismic Monitor" });
+    const added = await obsxa.observation.addMany(
       EARTHQUAKES.slice(0, 3).map((eq) => ({
         projectId: "seismic",
         title: `M ${eq.mag} - ${eq.place}`,
@@ -533,19 +524,18 @@ describe("usgs earthquake integration", () => {
       })),
     );
 
-    // Aftershock recurrence — bump the main quake
-    obsxa.observation.incrementFrequency(added[0]!.id);
-    obsxa.observation.incrementFrequency(added[0]!.id);
+    await obsxa.observation.incrementFrequency(added[0]!.id);
+    await obsxa.observation.incrementFrequency(added[0]!.id);
 
-    const frequent = obsxa.analysis.frequent("seismic");
+    const frequent = await obsxa.analysis.frequent("seismic");
     expect(frequent).toHaveLength(1);
     expect(frequent[0]!.id).toBe(added[0]!.id);
     expect(frequent[0]!.frequency).toBe(3);
   });
 
-  it("search finds earthquakes by region and magnitude", () => {
-    obsxa.project.add({ id: "seismic", name: "USGS Seismic Monitor" });
-    obsxa.observation.addMany(
+  it("search finds earthquakes by region and magnitude", async () => {
+    await obsxa.project.add({ id: "seismic", name: "USGS Seismic Monitor" });
+    await obsxa.observation.addMany(
       EARTHQUAKES.map((eq) => ({
         projectId: "seismic",
         title: `M ${eq.mag} - ${eq.place}`,
@@ -557,19 +547,19 @@ describe("usgs earthquake integration", () => {
       })),
     );
 
-    const japanResults = obsxa.search.search("Japan", "seismic");
+    const japanResults = await obsxa.search.search("Japan", "seismic");
     expect(japanResults.length).toBe(3);
 
-    const italyResults = obsxa.search.search("Italy", "seismic");
+    const italyResults = await obsxa.search.search("Italy", "seismic");
     expect(italyResults.length).toBe(1);
 
-    const alaskaResults = obsxa.search.search("Alaska", "seismic");
+    const alaskaResults = await obsxa.search.search("Alaska", "seismic");
     expect(alaskaResults.length).toBe(3);
   });
 
-  it("lifecycle: dismiss, archive, promote", () => {
-    obsxa.project.add({ id: "seismic", name: "USGS Seismic Monitor" });
-    const added = obsxa.observation.addMany(
+  it("lifecycle: dismiss, archive, promote", async () => {
+    await obsxa.project.add({ id: "seismic", name: "USGS Seismic Monitor" });
+    const added = await obsxa.observation.addMany(
       EARTHQUAKES.slice(0, 4).map((eq) => ({
         projectId: "seismic",
         title: `M ${eq.mag} - ${eq.place}`,
@@ -579,49 +569,42 @@ describe("usgs earthquake integration", () => {
       })),
     );
 
-    // Dismiss a low-significance quake
-    const dismissed = obsxa.observation.dismiss(added[2]!.id, {
+    const dismissed = await obsxa.observation.dismiss(added[2]!.id, {
       reasonCode: "noise",
       reasonNote: "Below signal threshold",
     });
     expect(dismissed.status).toBe("dismissed");
 
-    // Archive for later reference
-    const archived = obsxa.observation.archive(added[3]!.id, {
+    const archived = await obsxa.observation.archive(added[3]!.id, {
       reasonCode: "manual_review",
       reasonNote: "Needs geological review",
     });
     expect(archived.status).toBe("archived");
 
-    // Promote the main Japan quake to hypothesis
-    const promoted = obsxa.observation.promote(added[0]!.id, "hypxa:seismic:hirara-swarm");
+    const promoted = await obsxa.observation.promote(added[0]!.id, "hypxa:seismic:hirara-swarm");
     expect(promoted.status).toBe("promoted");
     expect(promoted.promotedTo).toBe("hypxa:seismic:hirara-swarm");
 
-    // Check transitions recorded
-    const transitions = obsxa.observation.transitions(added[0]!.id);
+    const transitions = await obsxa.observation.transitions(added[0]!.id);
     expect(transitions).toHaveLength(1);
     expect(transitions[0]!.toStatus).toBe("promoted");
 
-    // Stats reflect lifecycle changes
-    const stats = obsxa.analysis.stats("seismic");
-    expect(stats.active).toBe(1); // only added[1] remains active
+    const stats = await obsxa.analysis.stats("seismic");
+    expect(stats.active).toBe(1);
     expect(stats.promoted).toBe(1);
     expect(stats.dismissed).toBe(1);
     expect(stats.archived).toBe(1);
 
-    // Unpromoted should only contain the active one
-    const unpromoted = obsxa.analysis.unpromoted("seismic");
+    const unpromoted = await obsxa.analysis.unpromoted("seismic");
     expect(unpromoted).toHaveLength(1);
     expect(unpromoted[0]!.id).toBe(added[1]!.id);
   });
 
-  it("dedup: detects near-identical observations", () => {
-    obsxa.project.add({ id: "seismic", name: "USGS Seismic Monitor" });
+  it("dedup: detects near-identical observations", async () => {
+    await obsxa.project.add({ id: "seismic", name: "USGS Seismic Monitor" });
 
-    // Simulate duplicate ingestion (same earthquake from two pipeline runs)
     const quake = EARTHQUAKES[0]!;
-    obsxa.observation.add({
+    await obsxa.observation.add({
       projectId: "seismic",
       title: `M ${quake.mag} - ${quake.place}`,
       description: `Magnitude ${quake.mag} at depth ${quake.depth} km`,
@@ -630,7 +613,7 @@ describe("usgs earthquake integration", () => {
       sourceType: "external",
       tags: ["japan"],
     });
-    obsxa.observation.add({
+    await obsxa.observation.add({
       projectId: "seismic",
       title: `M ${quake.mag} - ${quake.place}`,
       description: `Magnitude ${quake.mag} at depth ${quake.depth} km`,
@@ -640,13 +623,12 @@ describe("usgs earthquake integration", () => {
       tags: ["japan"],
     });
 
-    const scan = obsxa.dedup.scan("seismic");
+    const scan = await obsxa.dedup.scan("seismic");
     expect(scan.checkedPairs).toBe(1);
     expect(scan.candidates).toHaveLength(1);
     expect(scan.candidates[0]!.reason).toBe("exact_fingerprint");
 
-    // Merge the duplicate
-    const merged = obsxa.dedup.merge(
+    const merged = await obsxa.dedup.merge(
       scan.candidates[0]!.primaryObservationId,
       scan.candidates[0]!.duplicateObservationId,
       { confidenceStrategy: "max", relationType: "duplicate_of" },
@@ -654,13 +636,13 @@ describe("usgs earthquake integration", () => {
     expect(merged.primary.frequency).toBe(2);
     expect(merged.merged.status).toBe("archived");
 
-    const resolved = obsxa.dedup.candidates("seismic", "resolved");
+    const resolved = await obsxa.dedup.candidates("seismic", "resolved");
     expect(resolved).toHaveLength(1);
   });
 
-  it("export/import round-trip preserves data", () => {
-    obsxa.project.add({ id: "seismic", name: "USGS Seismic Monitor" });
-    const originals = obsxa.observation.addMany(
+  it("export/import round-trip preserves data", async () => {
+    await obsxa.project.add({ id: "seismic", name: "USGS Seismic Monitor" });
+    const originals = await obsxa.observation.addMany(
       EARTHQUAKES.slice(0, 5).map((eq) => ({
         projectId: "seismic",
         title: `M ${eq.mag} - ${eq.place}`,
@@ -674,13 +656,11 @@ describe("usgs earthquake integration", () => {
       })),
     );
 
-    // Export as list
-    const exported = obsxa.observation.list("seismic");
+    const exported = await obsxa.observation.list("seismic");
     expect(exported).toHaveLength(5);
 
-    // Re-import into a fresh project
-    obsxa.project.add({ id: "seismic-copy", name: "Copy" });
-    const reimported = obsxa.observation.addMany(
+    await obsxa.project.add({ id: "seismic-copy", name: "Copy" });
+    const reimported = await obsxa.observation.addMany(
       exported.map((o) => ({
         projectId: "seismic-copy",
         title: o.title,
@@ -696,17 +676,19 @@ describe("usgs earthquake integration", () => {
     );
 
     expect(reimported).toHaveLength(5);
+    const originalsByTitle = [...originals].sort((a, b) => a.title.localeCompare(b.title));
+    const reimportedByTitle = [...reimported].sort((a, b) => a.title.localeCompare(b.title));
     for (let i = 0; i < 5; i++) {
-      expect(reimported[i]!.title).toBe(originals[i]!.title);
-      expect(reimported[i]!.confidence).toBe(originals[i]!.confidence);
-      expect(reimported[i]!.type).toBe(originals[i]!.type);
-      expect(reimported[i]!.tags).toEqual(originals[i]!.tags);
+      expect(reimportedByTitle[i]!.title).toBe(originalsByTitle[i]!.title);
+      expect(reimportedByTitle[i]!.confidence).toBe(originalsByTitle[i]!.confidence);
+      expect(reimportedByTitle[i]!.type).toBe(originalsByTitle[i]!.type);
+      expect(reimportedByTitle[i]!.tags).toEqual(originalsByTitle[i]!.tags);
     }
   });
 
-  it("TOON encode/decode round-trip", () => {
-    obsxa.project.add({ id: "seismic", name: "USGS Seismic Monitor" });
-    obsxa.observation.addMany(
+  it("TOON encode/decode round-trip", async () => {
+    await obsxa.project.add({ id: "seismic", name: "USGS Seismic Monitor" });
+    await obsxa.observation.addMany(
       EARTHQUAKES.slice(0, 3).map((eq) => ({
         projectId: "seismic",
         title: `M ${eq.mag} - ${eq.place}`,
@@ -718,31 +700,30 @@ describe("usgs earthquake integration", () => {
       })),
     );
 
-    const observations = obsxa.observation.list("seismic");
+    const observations = await obsxa.observation.list("seismic");
     const toonStr = encode(observations);
     expect(typeof toonStr).toBe("string");
     expect(toonStr.length).toBeGreaterThan(0);
 
     const decoded = decode(toonStr) as unknown as Observation[];
     expect(decoded).toHaveLength(3);
-    // TOON preserves structure — titles match
+    const decodedByTitle = [...decoded].sort((a, b) => a.title.localeCompare(b.title));
+    const observationsByTitle = [...observations].sort((a, b) => a.title.localeCompare(b.title));
     for (let i = 0; i < 3; i++) {
-      expect(decoded[i]!.title).toBe(observations[i]!.title);
-      expect(decoded[i]!.confidence).toBe(observations[i]!.confidence);
+      expect(decodedByTitle[i]!.title).toBe(observationsByTitle[i]!.title);
+      expect(decodedByTitle[i]!.confidence).toBe(observationsByTitle[i]!.confidence);
     }
   });
 
-  it("end-to-end: full pipeline from ingest to triage", () => {
-    // 1. Create project
-    const project = obsxa.project.add({
+  it("end-to-end: full pipeline from ingest to triage", async () => {
+    const project = await obsxa.project.add({
       id: "seismic-e2e",
       name: "E2E Seismic Monitor",
       description: "Full pipeline test with USGS data",
     });
     expect(project.id).toBe("seismic-e2e");
 
-    // 2. Ingest all 14 earthquakes
-    const added = obsxa.observation.addMany(
+    const added = await obsxa.observation.addMany(
       EARTHQUAKES.map((eq) => ({
         projectId: "seismic-e2e",
         title: `M ${eq.mag} - ${eq.place}`,
@@ -764,49 +745,43 @@ describe("usgs earthquake integration", () => {
     );
     expect(added).toHaveLength(14);
 
-    // 3. Create relations (within-region)
-    // Japan aftershock sequence
-    obsxa.relation.add({
+    await obsxa.relation.add({
       fromObservationId: added[1]!.id,
       toObservationId: added[0]!.id,
       type: "same_signal_as",
       confidence: 90,
     });
-    obsxa.relation.add({
+    await obsxa.relation.add({
       fromObservationId: added[2]!.id,
       toObservationId: added[0]!.id,
       type: "same_signal_as",
       confidence: 85,
     });
-    // Alaska seismicity
-    obsxa.relation.add({
+    await obsxa.relation.add({
       fromObservationId: added[4]!.id,
       toObservationId: added[3]!.id,
       type: "supports",
       confidence: 80,
     });
-    obsxa.relation.add({
+    await obsxa.relation.add({
       fromObservationId: added[5]!.id,
       toObservationId: added[3]!.id,
       type: "supports",
       confidence: 75,
     });
-    // Kamchatka pair
-    obsxa.relation.add({
+    await obsxa.relation.add({
       fromObservationId: added[7]!.id,
       toObservationId: added[6]!.id,
       type: "supports",
       confidence: 82,
     });
-    // Indonesia pair
-    obsxa.relation.add({
+    await obsxa.relation.add({
       fromObservationId: added[9]!.id,
       toObservationId: added[8]!.id,
       type: "supports",
       confidence: 78,
     });
 
-    // 4. Create regional clusters
     const regions: Record<string, number[]> = {};
     for (let i = 0; i < EARTHQUAKES.length; i++) {
       const r = regionKey(EARTHQUAKES[i]!.place);
@@ -816,75 +791,63 @@ describe("usgs earthquake integration", () => {
     let clusterCount = 0;
     for (const [region, ids] of Object.entries(regions)) {
       if (ids.length >= 2) {
-        const c = obsxa.cluster.add({ projectId: "seismic-e2e", name: `Region: ${region}` });
-        for (const id of ids) obsxa.cluster.addMember(c.id, id);
+        const c = await obsxa.cluster.add({ projectId: "seismic-e2e", name: `Region: ${region}` });
+        for (const id of ids) await obsxa.cluster.addMember(c.id, id);
         clusterCount++;
       }
     }
     expect(clusterCount).toBe(4);
 
-    // 5. Bump frequency on notable Japan swarm
-    obsxa.observation.incrementFrequency(added[0]!.id);
+    await obsxa.observation.incrementFrequency(added[0]!.id);
 
-    // 6. Analysis
-    const stats = obsxa.analysis.stats("seismic-e2e");
+    const stats = await obsxa.analysis.stats("seismic-e2e");
     expect(stats.total).toBe(14);
     expect(stats.active).toBe(14);
     expect(stats.totalClusters).toBe(4);
     expect(stats.byType.measurement).toBe(14);
 
-    const frequent = obsxa.analysis.frequent("seismic-e2e");
+    const frequent = await obsxa.analysis.frequent("seismic-e2e");
     expect(frequent).toHaveLength(1);
     expect(frequent[0]!.id).toBe(added[0]!.id);
 
-    const convergent = obsxa.analysis.convergent("seismic-e2e");
-    // Alaska[0] has 2 supports from different sources
+    const convergent = await obsxa.analysis.convergent("seismic-e2e");
     expect(convergent.map((o) => o.id)).toContain(added[3]!.id);
 
-    const isolated = obsxa.analysis.isolated("seismic-e2e");
-    // Tonga, Philippines, Chile are standalone (no relations)
-    expect(isolated.map((o) => o.id)).toContain(added[10]!.id); // Tonga
-    expect(isolated.map((o) => o.id)).toContain(added[12]!.id); // Philippines
-    expect(isolated.map((o) => o.id)).toContain(added[13]!.id); // Chile
+    const isolated = await obsxa.analysis.isolated("seismic-e2e");
+    expect(isolated.map((o) => o.id)).toContain(added[10]!.id);
+    expect(isolated.map((o) => o.id)).toContain(added[12]!.id);
+    expect(isolated.map((o) => o.id)).toContain(added[13]!.id);
 
-    const triaged = obsxa.analysis.triage("seismic-e2e", 14, "triage");
+    const triaged = await obsxa.analysis.triage("seismic-e2e", 14, "triage");
     expect(triaged).toHaveLength(14);
-    // Top score should be high
     expect(triaged[0]!.score).toBeGreaterThan(0);
 
-    // 7. Lifecycle operations
-    // Promote the Japan swarm leader as hypothesis
-    obsxa.observation.promote(added[0]!.id, "hypxa:seismic:hirara-swarm-2026");
-    // Dismiss Tonga as isolated low-interest
-    obsxa.observation.dismiss(added[10]!.id, {
+    await obsxa.observation.promote(added[0]!.id, "hypxa:seismic:hirara-swarm-2026");
+    await obsxa.observation.dismiss(added[10]!.id, {
       reasonCode: "noise",
       reasonNote: "Isolated deep event",
     });
-    // Archive Chile deep quake
-    obsxa.observation.archive(added[13]!.id, { reasonCode: "manual_review" });
+    await obsxa.observation.archive(added[13]!.id, { reasonCode: "manual_review" });
 
-    const finalStats = obsxa.analysis.stats("seismic-e2e");
+    const finalStats = await obsxa.analysis.stats("seismic-e2e");
     expect(finalStats.promoted).toBe(1);
     expect(finalStats.dismissed).toBe(1);
     expect(finalStats.archived).toBe(1);
     expect(finalStats.active).toBe(11);
 
-    // 8. Search
-    const searchJapan = obsxa.search.search("Hirara", "seismic-e2e");
+    const searchJapan = await obsxa.search.search("Hirara", "seismic-e2e");
     expect(searchJapan.length).toBe(3);
 
-    const searchItaly = obsxa.search.search("Anacapri", "seismic-e2e");
+    const searchItaly = await obsxa.search.search("Anacapri", "seismic-e2e");
     expect(searchItaly.length).toBe(1);
 
-    // 9. Unpromoted — should not contain promoted/dismissed/archived
-    const unpromoted = obsxa.analysis.unpromoted("seismic-e2e");
-    expect(unpromoted.map((o) => o.id)).not.toContain(added[0]!.id); // promoted
-    expect(unpromoted.map((o) => o.id)).not.toContain(added[10]!.id); // dismissed
-    expect(unpromoted.map((o) => o.id)).not.toContain(added[13]!.id); // archived
+    const unpromoted = await obsxa.analysis.unpromoted("seismic-e2e");
+    expect(unpromoted.map((o) => o.id)).not.toContain(added[0]!.id);
+    expect(unpromoted.map((o) => o.id)).not.toContain(added[10]!.id);
+    expect(unpromoted.map((o) => o.id)).not.toContain(added[13]!.id);
     expect(unpromoted).toHaveLength(11);
 
-    // 10. TOON round-trip on final state
-    const allObs = obsxa.observation.list("seismic-e2e");
+    const allObs = await obsxa.observation.list("seismic-e2e");
     const toonStr = encode(allObs);
     const decoded = decode(toonStr) as unknown as Observation[];
     expect(decoded).toHaveLength(14);
