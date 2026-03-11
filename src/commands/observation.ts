@@ -48,7 +48,7 @@ export function parseOptionalInt(
     consola.error(`--${name} must not be empty`);
     process.exit(1);
   }
-  if (!/^\d+$/.test(value)) {
+  if (!/^-?\d+$/.test(value)) {
     consola.error(`--${name} must be an integer, got "${value}"`);
     process.exit(1);
   }
@@ -69,6 +69,27 @@ export function parseOptionalInt(
 }
 
 const percentRange = { min: 0, max: 100 };
+const recordPercentFields = ["confidence", "evidenceStrength", "novelty", "uncertainty"] as const;
+
+type RecordPercentField = (typeof recordPercentFields)[number];
+
+export function validateRecordPercentages(
+  record: Partial<Record<RecordPercentField, unknown>>,
+  index: number,
+) {
+  for (const field of recordPercentFields) {
+    const value = record[field];
+    if (value === undefined) continue;
+    if (typeof value !== "number" || !Number.isFinite(value) || !Number.isSafeInteger(value)) {
+      consola.error(`Record[${index}].${field} must be an integer between 0 and 100`);
+      process.exit(1);
+    }
+    if (value < percentRange.min || value > percentRange.max) {
+      consola.error(`Record[${index}].${field} must be between 0 and 100`);
+      process.exit(1);
+    }
+  }
+}
 
 function readDataFile<T>(filePath: string): T {
   try {
@@ -179,6 +200,9 @@ export default defineCommand({
               consola.error("Import file must contain a JSON array");
               process.exit(1);
             }
+            records.forEach((record, index) => {
+              validateRecordPercentages(record, index);
+            });
             const obsxa = await open(args.db);
             try {
               const imported = await obsxa.observation.addMany(records);
@@ -247,6 +271,9 @@ export default defineCommand({
               consola.error("Batch-update file must contain a JSON array");
               process.exit(1);
             }
+            records.forEach((record, index) => {
+              validateRecordPercentages(record, index);
+            });
             const obsxa = await open(args.db);
             try {
               const updated = await obsxa.observation.updateMany(records);

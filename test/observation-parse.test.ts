@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { parseOptionalInt } from "../src/commands/observation.ts";
+import { parseOptionalInt, validateRecordPercentages } from "../src/commands/observation.ts";
 
-function withProcessExitStub(fn: () => void) {
+function withProcessExitStub(fn: () => void): void {
   const exitSpy = vi.spyOn(process, "exit").mockImplementation((code?: string | number | null) => {
     throw new Error(`process.exit:${code ?? 0}`);
   });
@@ -34,6 +34,22 @@ describe("parseOptionalInt", () => {
     ).toThrow("process.exit:1");
   });
 
+  it("exits for negative values", () => {
+    expect(() =>
+      withProcessExitStub(() => {
+        parseOptionalInt("-1", "confidence", { min: 0, max: 100 });
+      }),
+    ).toThrow("process.exit:1");
+  });
+
+  it("exits for non-numeric values", () => {
+    expect(() =>
+      withProcessExitStub(() => {
+        parseOptionalInt("abc", "confidence", { min: 0, max: 100 });
+      }),
+    ).toThrow("process.exit:1");
+  });
+
   it("exits for empty string", () => {
     expect(() =>
       withProcessExitStub(() => {
@@ -46,6 +62,45 @@ describe("parseOptionalInt", () => {
     expect(() =>
       withProcessExitStub(() => {
         parseOptionalInt("9007199254740993", "confidence", { min: 0, max: 100 });
+      }),
+    ).toThrow("process.exit:1");
+  });
+});
+
+describe("validateRecordPercentages", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("accepts integer percentages in range", () => {
+    expect(() => {
+      validateRecordPercentages(
+        { confidence: 10, evidenceStrength: 20, novelty: 30, uncertainty: 40 },
+        0,
+      );
+    }).not.toThrow();
+  });
+
+  it("exits for out-of-range record values", () => {
+    expect(() =>
+      withProcessExitStub(() => {
+        validateRecordPercentages({ confidence: 101 }, 3);
+      }),
+    ).toThrow("process.exit:1");
+  });
+
+  it("exits for decimal record values", () => {
+    expect(() =>
+      withProcessExitStub(() => {
+        validateRecordPercentages({ novelty: 12.5 }, 1);
+      }),
+    ).toThrow("process.exit:1");
+  });
+
+  it("exits for non-number record values", () => {
+    expect(() =>
+      withProcessExitStub(() => {
+        validateRecordPercentages({ uncertainty: "15" }, 2);
       }),
     ).toThrow("process.exit:1");
   });
