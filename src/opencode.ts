@@ -318,6 +318,11 @@ export function createObsxaPlugin(options?: ObsxaPluginOptions): Plugin {
             const sessionId = typeof info?.id === "string" ? info.id : "unknown";
             title = `Session created: ${sessionId}`;
             source = sessionId;
+          } else if (evt.type === "session.idle") {
+            const sessionId = typeof props.sessionID === "string" ? props.sessionID : "unknown";
+            const idleMs = typeof props.idleMs === "number" ? props.idleMs : undefined;
+            title = idleMs !== undefined ? `Session idle: ${sessionId} (${idleMs}ms)` : `Session idle: ${sessionId}`;
+            source = sessionId;
           } else {
             title = `Event: ${evt.type}`;
             source = evt.type;
