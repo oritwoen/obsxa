@@ -8,20 +8,23 @@ import { createObsxa, type ObsxaInstance } from "../src/index.ts";
 
 async function setSchemaVersion(dbPath: string, version: number): Promise<void> {
   const client = createClient({ url: `file:${dbPath}` });
-  await client.execute(`
-    CREATE TABLE IF NOT EXISTS obsxa_meta (
-      key TEXT PRIMARY KEY NOT NULL,
-      value TEXT NOT NULL,
-      updated_at INTEGER NOT NULL
-    )
-  `);
-  await client.execute({
-    sql: `INSERT INTO obsxa_meta (key, value, updated_at)
-      VALUES (?, ?, strftime('%s', 'now'))
-      ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`,
-    args: ["schema_version", String(version)],
-  });
-  client.close();
+  try {
+    await client.execute(`
+      CREATE TABLE IF NOT EXISTS obsxa_meta (
+        key TEXT PRIMARY KEY NOT NULL,
+        value TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    `);
+    await client.execute({
+      sql: `INSERT INTO obsxa_meta (key, value, updated_at)
+        VALUES (?, ?, strftime('%s', 'now'))
+        ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`,
+      args: ["schema_version", String(version)],
+    });
+  } finally {
+    client.close();
+  }
 }
 
 describe("obsxa", () => {

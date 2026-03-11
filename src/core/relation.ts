@@ -49,17 +49,38 @@ export function createRelationStore(db: ObsxaDB) {
         .get();
       if (existing) return toRelation(existing);
 
-      const row = await db
-        .insert(observationRelations)
-        .values({
-          fromObservationId: input.fromObservationId,
-          toObservationId: input.toObservationId,
-          type: input.type,
-          confidence,
-          notes: input.notes,
-        })
-        .returning()
-        .get();
+      let row: typeof observationRelations.$inferSelect;
+      try {
+        row = await db
+          .insert(observationRelations)
+          .values({
+            fromObservationId: input.fromObservationId,
+            toObservationId: input.toObservationId,
+            type: input.type,
+            confidence,
+            notes: input.notes,
+          })
+          .returning()
+          .get();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!/unique|constraint/i.test(message)) {
+          throw error;
+        }
+        const concurrent = await db
+          .select()
+          .from(observationRelations)
+          .where(
+            and(
+              eq(observationRelations.fromObservationId, input.fromObservationId),
+              eq(observationRelations.toObservationId, input.toObservationId),
+              eq(observationRelations.type, input.type),
+            ),
+          )
+          .get();
+        if (!concurrent) throw error;
+        return toRelation(concurrent);
+      }
 
       return toRelation(row);
     },

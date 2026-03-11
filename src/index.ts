@@ -205,58 +205,63 @@ export async function createObsxa(
 
   const client = createClient({ url: toLibsqlUrl(options.db) });
   try {
-    await client.execute("PRAGMA journal_mode = WAL");
-  } catch {}
-  try {
-    await client.execute("PRAGMA foreign_keys = ON");
-  } catch {}
+    try {
+      await client.execute("PRAGMA journal_mode = WAL");
+    } catch {}
+    try {
+      await client.execute("PRAGMA foreign_keys = ON");
+    } catch {}
 
-  await ensureMetaTable(client);
-  const beforeVersion = await getSchemaVersion(client);
-  if (beforeVersion !== null && beforeVersion > SCHEMA_VERSION) {
-    throw new Error(
-      `Database schema version ${beforeVersion} is newer than supported ${SCHEMA_VERSION}. Upgrade obsxa package.`,
-    );
-  }
+    await ensureMetaTable(client);
+    const beforeVersion = await getSchemaVersion(client);
+    if (beforeVersion !== null && beforeVersion > SCHEMA_VERSION) {
+      throw new Error(
+        `Database schema version ${beforeVersion} is newer than supported ${SCHEMA_VERSION}. Upgrade obsxa package.`,
+      );
+    }
 
-  const needsMigration = beforeVersion === null || beforeVersion < SCHEMA_VERSION;
-  if (needsMigration && !resolved.autoMigrate) {
-    throw new Error(
-      `Database schema version ${beforeVersion ?? 0} requires migration to ${SCHEMA_VERSION}, but autoMigrate is disabled.`,
-    );
-  }
+    const needsMigration = beforeVersion === null || beforeVersion < SCHEMA_VERSION;
+    if (needsMigration && !resolved.autoMigrate) {
+      throw new Error(
+        `Database schema version ${beforeVersion ?? 0} requires migration to ${SCHEMA_VERSION}, but autoMigrate is disabled.`,
+      );
+    }
 
-  if (needsMigration && shouldBackup(options.db, resolved.autoBackup)) {
-    const backupPath = makeBackupPath(options.db, resolved.backupDir);
-    backupDatabase(options.db, backupPath);
-  }
+    if (needsMigration && shouldBackup(options.db, resolved.autoBackup)) {
+      const backupPath = makeBackupPath(options.db, resolved.backupDir);
+      backupDatabase(options.db, backupPath);
+    }
 
-  const db: ObsxaDB = drizzle({ client });
-  if (needsMigration) {
-    await migrate(db, { migrationsFolder: findMigrationsFolder() });
-    await setSchemaVersion(client, SCHEMA_VERSION);
-  }
+    const db: ObsxaDB = drizzle({ client });
+    if (needsMigration) {
+      await migrate(db, { migrationsFolder: findMigrationsFolder() });
+      await setSchemaVersion(client, SCHEMA_VERSION);
+    }
 
-  for (const statement of CUSTOM_SQL) {
-    await client.execute(statement);
-  }
-  try {
-    for (const statement of FTS_SQL) {
+    for (const statement of CUSTOM_SQL) {
       await client.execute(statement);
     }
-  } catch {}
+    try {
+      for (const statement of FTS_SQL) {
+        await client.execute(statement);
+      }
+    } catch {}
 
-  return {
-    project: createProjectStore(db),
-    observation: createObservationStore(db),
-    relation: createRelationStore(db),
-    cluster: createClusterStore(db),
-    dedup: createDedupStore(db),
-    search: createSearchStore(client),
-    analysis: createAnalysisStore(db),
+    return {
+      project: createProjectStore(db),
+      observation: createObservationStore(db),
+      relation: createRelationStore(db),
+      cluster: createClusterStore(db),
+      dedup: createDedupStore(db),
+      search: createSearchStore(client),
+      analysis: createAnalysisStore(db),
 
-    async close() {
-      client.close();
-    },
-  };
+      async close() {
+        client.close();
+      },
+    };
+  } catch (error) {
+    client.close();
+    throw error;
+  }
 }
