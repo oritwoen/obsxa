@@ -112,9 +112,17 @@ function formatObservations(
   }>,
   maxChars: number,
 ): string {
+  const sanitizeForContext = (value: string): string =>
+    value
+      .replace(/\r?\n+/g, " ")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .trim();
+
   const lines = results.map(
     (r) =>
-      `- [${r.observation.type}] ${r.observation.title} (${r.observation.confidence}%, seen ${r.observation.frequency}x)`,
+      `- [${sanitizeForContext(r.observation.type)}] ${sanitizeForContext(r.observation.title)} (${r.observation.confidence}%, seen ${r.observation.frequency}x)`,
   );
   let output = "## Recent Observations\n" + lines.join("\n");
   if (output.length > maxChars) {
@@ -297,6 +305,20 @@ export function createObsxaPlugin(options?: ObsxaPluginOptions): Plugin {
             const existingId = await findByHash(obsxa, projectId, hash, hashCache);
             if (existingId !== undefined) {
               await obsxa.observation.incrementFrequency(existingId);
+              const msgObsId = getCacheValue(sessionMessageObs, toolInput.sessionID);
+              if (msgObsId !== undefined) {
+                try {
+                  await obsxa.relation.add({
+                    fromObservationId: existingId,
+                    toObservationId: msgObsId,
+                    type: "derived_from",
+                  });
+                } catch (err) {
+                  if (!isSqliteConstraintError(err)) {
+                    logHookError("tool.execute.after.relation", err);
+                  }
+                }
+              }
               return;
             }
 
@@ -332,10 +354,7 @@ export function createObsxaPlugin(options?: ObsxaPluginOptions): Plugin {
                   type: "derived_from",
                 });
               } catch (err) {
-                const message = err instanceof Error ? err.message : String(err);
-                const isConstraintViolation =
-                  message.includes("UNIQUE constraint") || message.includes("SQLITE_CONSTRAINT");
-                if (!isConstraintViolation) {
+                if (!isSqliteConstraintError(err)) {
                   logHookError("tool.execute.after.relation", err);
                 }
               }
@@ -434,7 +453,7 @@ export function createObsxaPlugin(options?: ObsxaPluginOptions): Plugin {
                 ? latestMessageBufferBySession.get(_sysInput.sessionID)
                 : latestMessageBuffer) ?? projectName;
 
-            const results = await obsxa.search.search(query, undefined, maxObs);
+            const results = await obsxa.search.search(query, projectId, maxObs);
 
             if (results.length > 0) {
               const formatted = formatObservations(results, maxChars);
