@@ -21,14 +21,14 @@ core/
 
 ## WHERE TO LOOK
 
-| Task | File | Notes |
-|------|------|-------|
-| Schema changes | `db.ts` | All table declarations + constraints start here |
-| Observation business rules | `observation.ts` | Status transitions, validation, edit history |
-| Duplicate logic | `dedup.ts` | Matching, candidate events, merge transaction |
-| Aggregates + triage | `analysis.ts` | Stats, convergent, isolated, triage sorting |
-| Search behavior | `search.ts` | FTS5 path + LIKE fallback |
-| Cross-module mapping | `mappers.ts` | Shared conversion/scoring helpers |
+| Task                       | File             | Notes                                           |
+| -------------------------- | ---------------- | ----------------------------------------------- |
+| Schema changes             | `db.ts`          | All table declarations + constraints start here |
+| Observation business rules | `observation.ts` | Status transitions, validation, edit history    |
+| Duplicate logic            | `dedup.ts`       | Matching, candidate events, merge transaction   |
+| Aggregates + triage        | `analysis.ts`    | Stats, convergent, isolated, triage sorting     |
+| Search behavior            | `search.ts`      | FTS5 path + LIKE fallback                       |
+| Cross-module mapping       | `mappers.ts`     | Shared conversion/scoring helpers               |
 
 ## CONVENTIONS
 

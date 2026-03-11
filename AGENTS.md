@@ -26,26 +26,26 @@ obsxa/
 
 ## WHERE TO LOOK
 
-| Task | Location | Notes |
-|------|----------|-------|
-| CLI routing | `src/cli.ts` | Dynamic imports per command module |
-| Runtime/bootstrap | `src/index.ts` | Meta table, schema versioning, migration, FTS triggers |
-| DB schema | `src/core/db.ts` | Drizzle sqlite table declarations |
-| Observation lifecycle | `src/core/observation.ts` | Add/update/promote/archive/dismiss flow |
-| Dedup + merge | `src/core/dedup.ts` | Similarity scoring + merge transaction |
-| AI tool contracts | `src/ai.ts` | Multi-operation tool schemas |
-| CLI arg validation | `src/commands/observation.ts` | Parsing, percent range checks, import/export |
-| End-to-end behavior | `test/index.test.ts` | Full lifecycle + migration safety |
-| Real-world scenario test | `test/usgs-earthquake.test.ts` | Large fixture-driven integration test |
+| Task                     | Location                       | Notes                                                  |
+| ------------------------ | ------------------------------ | ------------------------------------------------------ |
+| CLI routing              | `src/cli.ts`                   | Dynamic imports per command module                     |
+| Runtime/bootstrap        | `src/index.ts`                 | Meta table, schema versioning, migration, FTS triggers |
+| DB schema                | `src/core/db.ts`               | Drizzle sqlite table declarations                      |
+| Observation lifecycle    | `src/core/observation.ts`      | Add/update/promote/archive/dismiss flow                |
+| Dedup + merge            | `src/core/dedup.ts`            | Similarity scoring + merge transaction                 |
+| AI tool contracts        | `src/ai.ts`                    | Multi-operation tool schemas                           |
+| CLI arg validation       | `src/commands/observation.ts`  | Parsing, percent range checks, import/export           |
+| End-to-end behavior      | `test/index.test.ts`           | Full lifecycle + migration safety                      |
+| Real-world scenario test | `test/usgs-earthquake.test.ts` | Large fixture-driven integration test                  |
 
 ## CODE MAP
 
-| Symbol | Type | Location | Refs | Role |
-|--------|------|----------|------|------|
-| `createObsxa` | Function | `src/index.ts` | High | Main API constructor + bootstrap pipeline |
-| `createDedupStore` | Function | `src/core/dedup.ts` | High | Duplicate scan/review/merge engine |
-| `main` | Constant | `src/cli.ts` | Medium | CLI command graph root |
-| `observationTool` | Constant | `src/ai.ts` | Medium | AI SDK observation operations |
+| Symbol             | Type     | Location            | Refs   | Role                                      |
+| ------------------ | -------- | ------------------- | ------ | ----------------------------------------- |
+| `createObsxa`      | Function | `src/index.ts`      | High   | Main API constructor + bootstrap pipeline |
+| `createDedupStore` | Function | `src/core/dedup.ts` | High   | Duplicate scan/review/merge engine        |
+| `main`             | Constant | `src/cli.ts`        | Medium | CLI command graph root                    |
+| `observationTool`  | Constant | `src/ai.ts`         | Medium | AI SDK observation operations             |
 
 ## CONVENTIONS
 

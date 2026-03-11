@@ -25,13 +25,13 @@ commands/
 
 ## WHERE TO LOOK
 
-| Task | File | Notes |
-|------|------|-------|
-| Shared args/output format | `_db.ts` | `dbArgs`, JSON/TOON output, ID parsing |
-| Complex argument parsing | `observation.ts` | percent validation, import/export format parsing |
-| Dedup CLI flow | `dedup.ts` | threshold/status/options coercion |
-| Reporting commands | `status.ts`, `triage.ts`, `frequent.ts`, `unpromoted.ts` | thin wrappers around analysis store |
-| Backup UX | `backup.ts` | validates paths + backup/restore command boundary |
+| Task                      | File                                                     | Notes                                             |
+| ------------------------- | -------------------------------------------------------- | ------------------------------------------------- |
+| Shared args/output format | `_db.ts`                                                 | `dbArgs`, JSON/TOON output, ID parsing            |
+| Complex argument parsing  | `observation.ts`                                         | percent validation, import/export format parsing  |
+| Dedup CLI flow            | `dedup.ts`                                               | threshold/status/options coercion                 |
+| Reporting commands        | `status.ts`, `triage.ts`, `frequent.ts`, `unpromoted.ts` | thin wrappers around analysis store               |
+| Backup UX                 | `backup.ts`                                              | validates paths + backup/restore command boundary |
 
 ## CONVENTIONS
 

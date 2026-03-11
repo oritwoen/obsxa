@@ -15,11 +15,11 @@ test/
 
 ## WHERE TO LOOK
 
-| Task | File | Notes |
-|------|------|-------|
-| Full lifecycle coverage | `index.test.ts` | project/observation/relation/cluster/dedup/analysis + migration safety |
-| CLI parsing + validation | `observation-parse.test.ts` | parse helpers and `process.exit` behavior |
-| Real-world pipeline | `usgs-earthquake.test.ts` | fixture-heavy scenario and cross-feature integration |
+| Task                     | File                        | Notes                                                                  |
+| ------------------------ | --------------------------- | ---------------------------------------------------------------------- |
+| Full lifecycle coverage  | `index.test.ts`             | project/observation/relation/cluster/dedup/analysis + migration safety |
+| CLI parsing + validation | `observation-parse.test.ts` | parse helpers and `process.exit` behavior                              |
+| Real-world pipeline      | `usgs-earthquake.test.ts`   | fixture-heavy scenario and cross-feature integration                   |
 
 ## CONVENTIONS
 
