@@ -293,6 +293,7 @@ export function createObsxaPlugin(options?: ObsxaPluginOptions): Plugin {
       event: async (evtInput) => {
         try {
           if (closed) return;
+          if (!evtInput?.event) return;
           const evt = evtInput.event as { type: string; properties: Record<string, unknown> };
           const obsType = TRACKED_EVENTS[evt.type];
           if (!obsType) return;
