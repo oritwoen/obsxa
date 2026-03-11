@@ -7,6 +7,9 @@ import type { ObsxaInstance } from "./index.ts";
 
 function sanitizeDbPath(path?: string): string {
   const dbPath = path ?? getDefaultDbPath();
+  if (path && /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(path)) {
+    throw new Error("Database path must be relative");
+  }
   if (path && (isAbsolute(path) || /^[A-Za-z]:[\\/]/.test(path) || path.startsWith("\\\\"))) {
     throw new Error("Database path must be relative");
   }
