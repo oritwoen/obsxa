@@ -10,7 +10,7 @@
 - **Typecheck**: tsgo (native TypeScript)
 - **Release**: changelogen
 - **Package manager**: pnpm
-- **Database**: SQLite via better-sqlite3 + drizzle-orm
+- **Database**: SQLite via libsql + drizzle-orm
 - **Schema migrations**: drizzle-kit
 
 ## Scripts

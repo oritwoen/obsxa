@@ -26,22 +26,22 @@ export default defineCommand({
               description: "Near-duplicate threshold (0..1, default 0.72)",
             },
           },
-          run({ args }) {
+          async run({ args }) {
             const threshold = args.threshold ? Number.parseFloat(args.threshold) : 0.72;
             if (Number.isNaN(threshold) || threshold < 0 || threshold > 1) {
               consola.error("Threshold must be a number from 0 to 1");
               process.exit(1);
             }
 
-            const obsxa = open(args.db);
+            const obsxa = await open(args.db);
             try {
-              const result = obsxa.dedup.scan(args.project, threshold);
+              const result = await obsxa.dedup.scan(args.project, threshold);
               if (args.toon || args.json) return output(result, args.toon);
               consola.success(
                 `Scanned ${result.checkedPairs} pairs, found ${result.candidates.length} candidates`,
               );
             } finally {
-              obsxa.close();
+              await obsxa.close();
             }
           },
         }),
@@ -56,7 +56,7 @@ export default defineCommand({
             project: { type: "string", required: true, description: "Project ID" },
             status: { type: "string", description: "open|resolved|dismissed|all (default: open)" },
           },
-          run({ args }) {
+          async run({ args }) {
             if (
               args.status &&
               args.status !== "all" &&
@@ -69,9 +69,9 @@ export default defineCommand({
             }
 
             const status = (args.status ?? "open") as DuplicateCandidateStatus | "all";
-            const obsxa = open(args.db);
+            const obsxa = await open(args.db);
             try {
-              const rows = obsxa.dedup.candidates(args.project, status);
+              const rows = await obsxa.dedup.candidates(args.project, status);
               if (args.toon || args.json) return output(rows, args.toon);
               if (rows.length === 0) return consola.info("No duplicate candidates found.");
               for (const row of rows) {
@@ -80,7 +80,7 @@ export default defineCommand({
                 );
               }
             } finally {
-              obsxa.close();
+              await obsxa.close();
             }
           },
         }),
@@ -99,7 +99,7 @@ export default defineCommand({
             status: { type: "string", required: true, description: "open|resolved|dismissed" },
             reason: { type: "string", required: true, description: "Decision reason" },
           },
-          run({ args }) {
+          async run({ args }) {
             if (!statuses.includes(args.status as DuplicateCandidateStatus)) {
               consola.error(
                 `Invalid status "${args.status}". Must be one of: ${statuses.join(", ")}`,
@@ -109,9 +109,9 @@ export default defineCommand({
 
             const id = parseId(args.id, "id");
 
-            const obsxa = open(args.db);
+            const obsxa = await open(args.db);
             try {
-              const result = obsxa.dedup.review(
+              const result = await obsxa.dedup.review(
                 id,
                 args.status as DuplicateCandidateStatus,
                 args.reason,
@@ -121,7 +121,7 @@ export default defineCommand({
                 `Candidate #${result.candidate.id} moved to ${result.candidate.status}`,
               );
             } finally {
-              obsxa.close();
+              await obsxa.close();
             }
           },
         }),
@@ -157,7 +157,7 @@ export default defineCommand({
               description: "primary|duplicate|concat (default: concat)",
             },
           },
-          run({ args }) {
+          async run({ args }) {
             if (
               args.strategy &&
               !confidenceStrategies.includes(args.strategy as MergeConfidenceStrategy)
@@ -204,9 +204,9 @@ export default defineCommand({
               }
             }
 
-            const obsxa = open(args.db);
+            const obsxa = await open(args.db);
             try {
-              const result = obsxa.dedup.merge(primaryId, duplicateId, {
+              const result = await obsxa.dedup.merge(primaryId, duplicateId, {
                 confidenceStrategy: args.strategy as MergeConfidenceStrategy | undefined,
                 relationType: args["relation-type"] as ObservationRelationType | undefined,
                 relationConfidence,
@@ -222,7 +222,7 @@ export default defineCommand({
                 `Merged #${result.merged.id} into #${result.primary.id}; frequency=${result.primary.frequency}`,
               );
             } finally {
-              obsxa.close();
+              await obsxa.close();
             }
           },
         }),

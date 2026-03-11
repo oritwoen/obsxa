@@ -11,7 +11,7 @@ function sanitizeDbPath(path?: string): string {
   return dbPath;
 }
 
-function getOrCreate(dbPath?: string): ObsxaInstance {
+async function getOrCreate(dbPath?: string): Promise<ObsxaInstance> {
   return createObsxa({ db: sanitizeDbPath(dbPath) });
 }
 
@@ -163,21 +163,21 @@ export const observationTool = tool({
     }),
   ]),
   execute: async (input) => {
-    const obsxa = getOrCreate(input.db);
+    const obsxa = await getOrCreate(input.db);
     try {
       switch (input.operation) {
         case "add":
-          return obsxa.observation.add(input);
+          return await obsxa.observation.add(input);
         case "get":
-          return obsxa.observation.get(input.id);
+          return await obsxa.observation.get(input.id);
         case "list":
-          return obsxa.observation.list(input.projectId, {
+          return await obsxa.observation.list(input.projectId, {
             status: input.status,
             type: input.type,
             sourceType: input.sourceType,
           });
         case "update":
-          return obsxa.observation.update(input.id, {
+          return await obsxa.observation.update(input.id, {
             title: input.title,
             description: input.description,
             type: input.type,
@@ -197,28 +197,28 @@ export const observationTool = tool({
             reproducibilityHint: input.reproducibilityHint,
           });
         case "transitions":
-          return obsxa.observation.transitions(input.id);
+          return await obsxa.observation.transitions(input.id);
         case "edits":
-          return obsxa.observation.edits(input.id);
+          return await obsxa.observation.edits(input.id);
         case "dismiss":
-          return obsxa.observation.dismiss(input.id, {
+          return await obsxa.observation.dismiss(input.id, {
             reasonCode: input.reasonCode,
             reasonNote: input.reasonNote,
           });
         case "archive":
-          return obsxa.observation.archive(input.id, {
+          return await obsxa.observation.archive(input.id, {
             reasonCode: input.reasonCode,
             reasonNote: input.reasonNote,
           });
         case "bump":
-          return obsxa.observation.incrementFrequency(input.id);
+          return await obsxa.observation.incrementFrequency(input.id);
         case "import":
-          return obsxa.observation.addMany(input.records);
+          return await obsxa.observation.addMany(input.records);
         case "batchUpdate":
-          return obsxa.observation.updateMany(input.records);
+          return await obsxa.observation.updateMany(input.records);
       }
     } finally {
-      obsxa.close();
+      await obsxa.close();
     }
   },
 });
@@ -250,16 +250,16 @@ export const relationTool = tool({
     }),
   ]),
   execute: async (input) => {
-    const obsxa = getOrCreate(input.db);
+    const obsxa = await getOrCreate(input.db);
     try {
       switch (input.operation) {
         case "add":
-          return obsxa.relation.add(input);
+          return await obsxa.relation.add(input);
         case "list":
-          return obsxa.relation.list(input.observationId);
+          return await obsxa.relation.list(input.observationId);
       }
     } finally {
-      obsxa.close();
+      await obsxa.close();
     }
   },
 });
@@ -288,24 +288,24 @@ export const clusterTool = tool({
     }),
   ]),
   execute: async (input) => {
-    const obsxa = getOrCreate(input.db);
+    const obsxa = await getOrCreate(input.db);
     try {
       switch (input.operation) {
         case "add":
-          return obsxa.cluster.add({
+          return await obsxa.cluster.add({
             projectId: input.projectId,
             name: input.name,
             description: input.description,
           });
         case "list":
-          return obsxa.cluster.list(input.projectId);
+          return await obsxa.cluster.list(input.projectId);
         case "addMember":
-          return obsxa.cluster.addMember(input.clusterId, input.observationId);
+          return await obsxa.cluster.addMember(input.clusterId, input.observationId);
         case "listMembers":
-          return obsxa.cluster.listMembers(input.clusterId);
+          return await obsxa.cluster.listMembers(input.clusterId);
       }
     } finally {
-      obsxa.close();
+      await obsxa.close();
     }
   },
 });
@@ -319,11 +319,11 @@ export const searchTool = tool({
     limit: z.number().optional(),
   }),
   execute: async ({ db, query, projectId, limit }) => {
-    const obsxa = getOrCreate(db);
+    const obsxa = await getOrCreate(db);
     try {
-      return obsxa.search.search(query, projectId, limit);
+      return await obsxa.search.search(query, projectId, limit);
     } finally {
-      obsxa.close();
+      await obsxa.close();
     }
   },
 });
@@ -367,26 +367,26 @@ export const analysisTool = tool({
     }),
   ]),
   execute: async (input) => {
-    const obsxa = getOrCreate(input.db);
+    const obsxa = await getOrCreate(input.db);
     try {
       switch (input.operation) {
         case "stats":
-          return obsxa.analysis.stats(input.projectId);
+          return await obsxa.analysis.stats(input.projectId);
         case "frequent":
-          return obsxa.analysis.frequent(input.projectId);
+          return await obsxa.analysis.frequent(input.projectId);
         case "isolated":
-          return obsxa.analysis.isolated(input.projectId);
+          return await obsxa.analysis.isolated(input.projectId);
         case "convergent":
-          return obsxa.analysis.convergent(input.projectId);
+          return await obsxa.analysis.convergent(input.projectId);
         case "promoted":
-          return obsxa.analysis.promoted(input.projectId);
+          return await obsxa.analysis.promoted(input.projectId);
         case "unpromoted":
-          return obsxa.analysis.unpromoted(input.projectId);
+          return await obsxa.analysis.unpromoted(input.projectId);
         case "triage":
-          return obsxa.analysis.triage(input.projectId, input.limit, input.sort);
+          return await obsxa.analysis.triage(input.projectId, input.limit, input.sort);
       }
     } finally {
-      obsxa.close();
+      await obsxa.close();
     }
   },
 });
@@ -399,11 +399,11 @@ export const promoteTool = tool({
     hypothesisRef: z.string(),
   }),
   execute: async ({ db, observationId, hypothesisRef }) => {
-    const obsxa = getOrCreate(db);
+    const obsxa = await getOrCreate(db);
     try {
-      return obsxa.observation.promote(observationId, hypothesisRef);
+      return await obsxa.observation.promote(observationId, hypothesisRef);
     } finally {
-      obsxa.close();
+      await obsxa.close();
     }
   },
 });
@@ -453,17 +453,17 @@ export const dedupTool = tool({
     }),
   ]),
   execute: async (input) => {
-    const obsxa = getOrCreate(input.db);
+    const obsxa = await getOrCreate(input.db);
     try {
       switch (input.operation) {
         case "scan":
-          return obsxa.dedup.scan(input.projectId, input.threshold);
+          return await obsxa.dedup.scan(input.projectId, input.threshold);
         case "candidates":
-          return obsxa.dedup.candidates(input.projectId, input.status);
+          return await obsxa.dedup.candidates(input.projectId, input.status);
         case "review":
-          return obsxa.dedup.review(input.candidateId, input.status, input.reason);
+          return await obsxa.dedup.review(input.candidateId, input.status, input.reason);
         case "merge":
-          return obsxa.dedup.merge(input.primaryObservationId, input.duplicateObservationId, {
+          return await obsxa.dedup.merge(input.primaryObservationId, input.duplicateObservationId, {
             confidenceStrategy: input.confidenceStrategy,
             relationType: input.relationType,
             relationConfidence: input.relationConfidence,
@@ -472,7 +472,7 @@ export const dedupTool = tool({
           });
       }
     } finally {
-      obsxa.close();
+      await obsxa.close();
     }
   },
 });

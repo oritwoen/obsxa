@@ -8,17 +8,17 @@ export default defineCommand({
     ...dbArgs,
     projectId: { type: "positional", required: true, description: "Project ID" },
   },
-  run({ args }) {
-    const obsxa = open(args.db);
+  async run({ args }) {
+    const obsxa = await open(args.db);
     try {
-      const rows = obsxa.analysis.unpromoted(args.projectId);
+      const rows = await obsxa.analysis.unpromoted(args.projectId);
       if (args.toon || args.json) return output(rows, args.toon);
       if (rows.length === 0) return consola.info("No unpromoted observations found.");
       for (const row of rows) {
         consola.log(`#${row.id} ${row.title}`);
       }
     } finally {
-      obsxa.close();
+      await obsxa.close();
     }
   },
 });

@@ -8,17 +8,17 @@ export default defineCommand({
     ...dbArgs,
     projectId: { type: "positional", required: true, description: "Project ID" },
   },
-  run({ args }) {
-    const obsxa = open(args.db);
+  async run({ args }) {
+    const obsxa = await open(args.db);
     try {
-      const rows = obsxa.analysis.frequent(args.projectId);
+      const rows = await obsxa.analysis.frequent(args.projectId);
       if (args.toon || args.json) return output(rows, args.toon);
       if (rows.length === 0) return consola.info("No frequent observations found.");
       for (const row of rows) {
         consola.log(`#${row.id} f=${row.frequency} ${row.title}`);
       }
     } finally {
-      obsxa.close();
+      await obsxa.close();
     }
   },
 });

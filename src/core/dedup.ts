@@ -120,13 +120,10 @@ function mergeConfidence(
 
 export function createDedupStore(db: ObsxaDB) {
   return {
-    scan(projectId: string, threshold = 0.72): ScanDuplicatesResult {
-      const rows = db
-        .select()
-        .from(observations)
-        .where(eq(observations.projectId, projectId))
-        .all()
-        .map(toObservation);
+    async scan(projectId: string, threshold = 0.72): Promise<ScanDuplicatesResult> {
+      const rows = (
+        await db.select().from(observations).where(eq(observations.projectId, projectId)).all()
+      ).map(toObservation);
 
       const results: DuplicateCandidate[] = [];
       let checkedPairs = 0;
@@ -202,7 +199,7 @@ export function createDedupStore(db: ObsxaDB) {
           if (!reason) continue;
 
           const storedScore = Math.round(score * 1000);
-          const existing = db
+          const existing = await db
             .select()
             .from(duplicateCandidates)
             .where(
@@ -214,7 +211,7 @@ export function createDedupStore(db: ObsxaDB) {
             .get();
 
           if (existing) {
-            const updated = db
+            const updated = await db
               .update(duplicateCandidates)
               .set({
                 reason,
@@ -228,7 +225,7 @@ export function createDedupStore(db: ObsxaDB) {
             continue;
           }
 
-          const inserted = db
+          const inserted = await db
             .insert(duplicateCandidates)
             .values({
               projectId,
@@ -247,37 +244,44 @@ export function createDedupStore(db: ObsxaDB) {
       return { candidates: results.sort((a, b) => b.score - a.score), checkedPairs };
     },
 
-    candidates(
+    async candidates(
       projectId: string,
       status: DuplicateCandidateStatus | "all" = "open",
-    ): DuplicateCandidate[] {
+    ): Promise<DuplicateCandidate[]> {
       if (status === "all") {
-        return db
-          .select()
-          .from(duplicateCandidates)
-          .where(eq(duplicateCandidates.projectId, projectId))
-          .all()
+        return (
+          await db
+            .select()
+            .from(duplicateCandidates)
+            .where(eq(duplicateCandidates.projectId, projectId))
+            .all()
+        )
           .map(toCandidate)
           .sort((a, b) => b.score - a.score);
       }
 
-      return db
-        .select()
-        .from(duplicateCandidates)
-        .where(
-          and(eq(duplicateCandidates.projectId, projectId), eq(duplicateCandidates.status, status)),
-        )
-        .all()
+      return (
+        await db
+          .select()
+          .from(duplicateCandidates)
+          .where(
+            and(
+              eq(duplicateCandidates.projectId, projectId),
+              eq(duplicateCandidates.status, status),
+            ),
+          )
+          .all()
+      )
         .map(toCandidate)
         .sort((a, b) => b.score - a.score);
     },
 
-    review(
+    async review(
       candidateId: number,
       status: DuplicateCandidateStatus,
       reason: string,
-    ): CandidateReviewResult {
-      const current = db
+    ): Promise<CandidateReviewResult> {
+      const current = await db
         .select()
         .from(duplicateCandidates)
         .where(eq(duplicateCandidates.id, candidateId))
@@ -286,14 +290,14 @@ export function createDedupStore(db: ObsxaDB) {
       if (current.status === status)
         throw new Error(`Candidate #${candidateId} is already ${status}`);
 
-      const updated = db
+      const updated = await db
         .update(duplicateCandidates)
         .set({ status, updatedAt: new Date() })
         .where(eq(duplicateCandidates.id, candidateId))
         .returning()
         .get();
 
-      const event = db
+      const event = await db
         .insert(duplicateCandidateEvents)
         .values({
           candidateId,
@@ -310,22 +314,22 @@ export function createDedupStore(db: ObsxaDB) {
       };
     },
 
-    merge(
+    async merge(
       primaryObservationId: number,
       duplicateObservationId: number,
       options: MergeOptions = {},
-    ): MergeResult {
+    ): Promise<MergeResult> {
       if (primaryObservationId === duplicateObservationId) {
         throw new Error("Cannot merge observation into itself");
       }
 
-      return db.transaction((tx) => {
-        const primaryRow = tx
+      return db.transaction(async (tx) => {
+        const primaryRow = await tx
           .select()
           .from(observations)
           .where(eq(observations.id, primaryObservationId))
           .get();
-        const duplicateRow = tx
+        const duplicateRow = await tx
           .select()
           .from(observations)
           .where(eq(observations.id, duplicateObservationId))
@@ -365,7 +369,7 @@ export function createDedupStore(db: ObsxaDB) {
           frequency: mergedFrequency,
         });
 
-        const updatedPrimaryRow = tx
+        const updatedPrimaryRow = await tx
           .update(observations)
           .set({
             description,
@@ -381,7 +385,8 @@ export function createDedupStore(db: ObsxaDB) {
           .returning()
           .get();
 
-        tx.update(observations)
+        await tx
+          .update(observations)
           .set({
             status: "archived",
             archivedReasonCode: "merged",
@@ -391,7 +396,8 @@ export function createDedupStore(db: ObsxaDB) {
           .where(eq(observations.id, duplicateObservationId))
           .run();
 
-        tx.insert(observationStatusEvents)
+        await tx
+          .insert(observationStatusEvents)
           .values({
             observationId: duplicateObservationId,
             fromStatus: duplicate.status,
@@ -401,7 +407,7 @@ export function createDedupStore(db: ObsxaDB) {
           })
           .run();
 
-        const primaryFromRelations = tx
+        const primaryFromRelations = await tx
           .select({
             to: observationRelations.toObservationId,
             type: observationRelations.type,
@@ -409,7 +415,7 @@ export function createDedupStore(db: ObsxaDB) {
           .from(observationRelations)
           .where(eq(observationRelations.fromObservationId, primaryObservationId))
           .all();
-        const primaryToRelations = tx
+        const primaryToRelations = await tx
           .select({
             from: observationRelations.fromObservationId,
             type: observationRelations.type,
@@ -421,7 +427,7 @@ export function createDedupStore(db: ObsxaDB) {
         const primaryFromKeys = new Set(primaryFromRelations.map((r) => `${r.to}:${r.type}`));
         const primaryToKeys = new Set(primaryToRelations.map((r) => `${r.from}:${r.type}`));
 
-        const duplicateFromRelations = tx
+        const duplicateFromRelations = await tx
           .select({
             id: observationRelations.id,
             to: observationRelations.toObservationId,
@@ -430,7 +436,7 @@ export function createDedupStore(db: ObsxaDB) {
           .from(observationRelations)
           .where(eq(observationRelations.fromObservationId, duplicateObservationId))
           .all();
-        const duplicateToRelations = tx
+        const duplicateToRelations = await tx
           .select({
             id: observationRelations.id,
             from: observationRelations.fromObservationId,
@@ -442,32 +448,35 @@ export function createDedupStore(db: ObsxaDB) {
 
         for (const rel of duplicateFromRelations) {
           if (primaryFromKeys.has(`${rel.to}:${rel.type}`)) {
-            tx.delete(observationRelations).where(eq(observationRelations.id, rel.id)).run();
+            await tx.delete(observationRelations).where(eq(observationRelations.id, rel.id)).run();
           }
         }
         for (const rel of duplicateToRelations) {
           if (primaryToKeys.has(`${rel.from}:${rel.type}`)) {
-            tx.delete(observationRelations).where(eq(observationRelations.id, rel.id)).run();
+            await tx.delete(observationRelations).where(eq(observationRelations.id, rel.id)).run();
           }
         }
 
-        tx.update(observationRelations)
+        await tx
+          .update(observationRelations)
           .set({ fromObservationId: primaryObservationId })
           .where(eq(observationRelations.fromObservationId, duplicateObservationId))
           .run();
 
-        tx.update(observationRelations)
+        await tx
+          .update(observationRelations)
           .set({ toObservationId: primaryObservationId })
           .where(eq(observationRelations.toObservationId, duplicateObservationId))
           .run();
 
-        tx.delete(observationRelations)
+        await tx
+          .delete(observationRelations)
           .where(
             sql`${observationRelations.fromObservationId} = ${observationRelations.toObservationId}`,
           )
           .run();
 
-        const relationRows = tx
+        const relationRows = await tx
           .select()
           .from(observationRelations)
           .where(
@@ -481,7 +490,8 @@ export function createDedupStore(db: ObsxaDB) {
         for (const relationRow of relationRows) {
           const key = `${relationRow.fromObservationId}:${relationRow.toObservationId}:${relationRow.type}`;
           if (seen.has(key)) {
-            tx.delete(observationRelations)
+            await tx
+              .delete(observationRelations)
               .where(eq(observationRelations.id, relationRow.id))
               .run();
             continue;
@@ -489,13 +499,13 @@ export function createDedupStore(db: ObsxaDB) {
           seen.add(key);
         }
 
-        const duplicateMemberships = tx
+        const duplicateMemberships = await tx
           .select()
           .from(clusterMembers)
           .where(eq(clusterMembers.observationId, duplicateObservationId))
           .all();
         for (const member of duplicateMemberships) {
-          const existingPrimaryMembership = tx
+          const existingPrimaryMembership = await tx
             .select()
             .from(clusterMembers)
             .where(
@@ -506,12 +516,13 @@ export function createDedupStore(db: ObsxaDB) {
             )
             .get();
           if (!existingPrimaryMembership) {
-            tx.update(clusterMembers)
+            await tx
+              .update(clusterMembers)
               .set({ observationId: primaryObservationId })
               .where(eq(clusterMembers.id, member.id))
               .run();
           } else {
-            tx.delete(clusterMembers).where(eq(clusterMembers.id, member.id)).run();
+            await tx.delete(clusterMembers).where(eq(clusterMembers.id, member.id)).run();
           }
         }
 
@@ -520,7 +531,7 @@ export function createDedupStore(db: ObsxaDB) {
         const relationNotes = options.relationNotes ?? `Merged into #${primaryObservationId}`;
         let relation: ObservationRelation | null = null;
 
-        const existingRelation = tx
+        const existingRelation = await tx
           .select()
           .from(observationRelations)
           .where(
@@ -533,13 +544,13 @@ export function createDedupStore(db: ObsxaDB) {
           .get();
 
         const relationRow = existingRelation
-          ? tx
+          ? await tx
               .update(observationRelations)
               .set({ confidence: relationConfidence, notes: relationNotes })
               .where(eq(observationRelations.id, existingRelation.id))
               .returning()
               .get()
-          : tx
+          : await tx
               .insert(observationRelations)
               .values({
                 fromObservationId: duplicateObservationId,
@@ -558,7 +569,7 @@ export function createDedupStore(db: ObsxaDB) {
           mergedTagsCount: mergedTags.length,
           confidenceStrategy,
         });
-        const mergeRow = tx
+        const mergeRow = await tx
           .insert(observationMerges)
           .values({
             projectId: primary.projectId,
@@ -571,7 +582,7 @@ export function createDedupStore(db: ObsxaDB) {
           .returning()
           .get();
 
-        const relatedCandidates = tx
+        const relatedCandidates = await tx
           .select()
           .from(duplicateCandidates)
           .where(
@@ -587,12 +598,14 @@ export function createDedupStore(db: ObsxaDB) {
 
         for (const candidate of relatedCandidates) {
           if (candidate.status !== "resolved") {
-            tx.update(duplicateCandidates)
+            await tx
+              .update(duplicateCandidates)
               .set({ status: "resolved", updatedAt: new Date() })
               .where(eq(duplicateCandidates.id, candidate.id))
               .run();
 
-            tx.insert(duplicateCandidateEvents)
+            await tx
+              .insert(duplicateCandidateEvents)
               .values({
                 candidateId: candidate.id,
                 fromStatus: candidate.status,
@@ -603,7 +616,7 @@ export function createDedupStore(db: ObsxaDB) {
           }
         }
 
-        const mergedRow = tx
+        const mergedRow = await tx
           .select()
           .from(observations)
           .where(eq(observations.id, duplicateObservationId))
