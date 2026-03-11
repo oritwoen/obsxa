@@ -14,8 +14,8 @@ function toProject(row: typeof projects.$inferSelect): Project {
 
 export function createProjectStore(db: ObsxaDB) {
   return {
-    add(input: CreateProject): Project {
-      const row = db
+    async add(input: CreateProject): Promise<Project> {
+      const row = await db
         .insert(projects)
         .values({
           id: input.id,
@@ -28,17 +28,17 @@ export function createProjectStore(db: ObsxaDB) {
       return toProject(row);
     },
 
-    get(id: string): Project | null {
-      const row = db.select().from(projects).where(eq(projects.id, id)).get();
+    async get(id: string): Promise<Project | null> {
+      const row = await db.select().from(projects).where(eq(projects.id, id)).get();
       return row ? toProject(row) : null;
     },
 
-    list(): Project[] {
-      return db.select().from(projects).all().map(toProject);
+    async list(): Promise<Project[]> {
+      return (await db.select().from(projects).all()).map(toProject);
     },
 
-    remove(id: string): void {
-      db.delete(projects).where(eq(projects.id, id)).run();
+    async remove(id: string): Promise<void> {
+      await db.delete(projects).where(eq(projects.id, id)).run();
     },
   };
 }

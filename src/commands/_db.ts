@@ -8,7 +8,7 @@ export const dbArgs = {
   toon: { type: "boolean" as const, description: "Output as TOON", default: false },
 };
 
-export function open(dbPath: string) {
+export async function open(dbPath: string) {
   return createObsxa({ db: dbPath });
 }
 

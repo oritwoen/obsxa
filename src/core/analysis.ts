@@ -6,8 +6,8 @@ import type { Observation, ProjectStats, TriageRow } from "../types.ts";
 
 export function createAnalysisStore(db: ObsxaDB) {
   return {
-    stats(projectId: string): ProjectStats {
-      const rows = db
+    async stats(projectId: string): Promise<ProjectStats> {
+      const rows = await db
         .select()
         .from(observations)
         .where(eq(observations.projectId, projectId))
@@ -21,11 +21,13 @@ export function createAnalysisStore(db: ObsxaDB) {
       const avgConfidence =
         total > 0 ? Math.round(rows.reduce((sum, row) => sum + row.confidence, 0) / total) : 0;
 
-      const totalClusters = db
-        .select({ id: clusters.id })
-        .from(clusters)
-        .where(eq(clusters.projectId, projectId))
-        .all().length;
+      const totalClusters = (
+        await db
+          .select({ id: clusters.id })
+          .from(clusters)
+          .where(eq(clusters.projectId, projectId))
+          .all()
+      ).length;
 
       return {
         total,
@@ -45,20 +47,22 @@ export function createAnalysisStore(db: ObsxaDB) {
       };
     },
 
-    frequent(projectId: string): Observation[] {
-      return db
-        .select()
-        .from(observations)
-        .where(
-          and(eq(observations.projectId, projectId), notInArray(observations.frequency, [0, 1])),
-        )
-        .all()
+    async frequent(projectId: string): Promise<Observation[]> {
+      return (
+        await db
+          .select()
+          .from(observations)
+          .where(
+            and(eq(observations.projectId, projectId), notInArray(observations.frequency, [0, 1])),
+          )
+          .all()
+      )
         .map(toObservation)
         .sort((a, b) => b.frequency - a.frequency);
     },
 
-    isolated(projectId: string): Observation[] {
-      const projectObservations = db
+    async isolated(projectId: string): Promise<Observation[]> {
+      const projectObservations = await db
         .select({ id: observations.id })
         .from(observations)
         .where(eq(observations.projectId, projectId))
@@ -66,7 +70,7 @@ export function createAnalysisStore(db: ObsxaDB) {
       const ids = projectObservations.map((row) => row.id);
       if (ids.length === 0) return [];
 
-      const relationRows = db
+      const relationRows = await db
         .select({
           fromObservationId: observationRelations.fromObservationId,
           toObservationId: observationRelations.toObservationId,
@@ -86,17 +90,15 @@ export function createAnalysisStore(db: ObsxaDB) {
         relatedIds.add(row.toObservationId);
       }
 
-      return db
-        .select()
-        .from(observations)
-        .where(eq(observations.projectId, projectId))
-        .all()
+      return (
+        await db.select().from(observations).where(eq(observations.projectId, projectId)).all()
+      )
         .filter((row) => !relatedIds.has(row.id))
         .map(toObservation);
     },
 
-    convergent(projectId: string): Observation[] {
-      const allObs = db
+    async convergent(projectId: string): Promise<Observation[]> {
+      const allObs = await db
         .select()
         .from(observations)
         .where(eq(observations.projectId, projectId))
@@ -106,7 +108,7 @@ export function createAnalysisStore(db: ObsxaDB) {
       const byId = new Map(allObs.map((o) => [o.id, o]));
       const ids = allObs.map((o) => o.id);
 
-      const supports = db
+      const supports = await db
         .select()
         .from(observationRelations)
         .where(
@@ -132,27 +134,34 @@ export function createAnalysisStore(db: ObsxaDB) {
         .map(toObservation);
     },
 
-    promoted(projectId: string): Observation[] {
-      return db
-        .select()
-        .from(observations)
-        .where(and(eq(observations.projectId, projectId), eq(observations.status, "promoted")))
-        .all()
-        .map(toObservation);
+    async promoted(projectId: string): Promise<Observation[]> {
+      return (
+        await db
+          .select()
+          .from(observations)
+          .where(and(eq(observations.projectId, projectId), eq(observations.status, "promoted")))
+          .all()
+      ).map(toObservation);
     },
 
-    unpromoted(projectId: string): Observation[] {
-      return db
-        .select()
-        .from(observations)
-        .where(and(eq(observations.projectId, projectId), eq(observations.status, "active")))
-        .all()
+    async unpromoted(projectId: string): Promise<Observation[]> {
+      return (
+        await db
+          .select()
+          .from(observations)
+          .where(and(eq(observations.projectId, projectId), eq(observations.status, "active")))
+          .all()
+      )
         .filter((row) => row.promotedTo === null)
         .map(toObservation);
     },
 
-    triage(projectId: string, limit = 25, sort: "triage" | "recent" = "triage"): TriageRow[] {
-      const activeRows = db
+    async triage(
+      projectId: string,
+      limit = 25,
+      sort: "triage" | "recent" = "triage",
+    ): Promise<TriageRow[]> {
+      const activeRows = await db
         .select()
         .from(observations)
         .where(and(eq(observations.projectId, projectId), eq(observations.status, "active")))
@@ -161,7 +170,7 @@ export function createAnalysisStore(db: ObsxaDB) {
       const ids = activeRows.map((row) => row.id);
       if (ids.length === 0) return [];
 
-      const relations = db
+      const relations = await db
         .select()
         .from(observationRelations)
         .where(

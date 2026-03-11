@@ -19,7 +19,7 @@ export default defineCommand({
             confidence: { type: "string", description: "Confidence 0-100 (default: 100)" },
             notes: { type: "string", description: "Optional relation notes" },
           },
-          run({ args }) {
+          async run({ args }) {
             if (!RELATION_TYPES.includes(args.type as ObservationRelationType)) {
               consola.error(
                 `Invalid type "${args.type}". Must be one of: ${RELATION_TYPES.join(", ")}`,
@@ -45,9 +45,9 @@ export default defineCommand({
               process.exit(1);
             }
 
-            const obsxa = open(args.db);
+            const obsxa = await open(args.db);
             try {
-              const relation = obsxa.relation.add({
+              const relation = await obsxa.relation.add({
                 fromObservationId: fromId,
                 toObservationId: toId,
                 type: args.type as ObservationRelationType,
@@ -57,7 +57,7 @@ export default defineCommand({
               if (args.toon || args.json) return output(relation, args.toon);
               consola.success(`Relation #${relation.id} added`);
             } finally {
-              obsxa.close();
+              await obsxa.close();
             }
           },
         }),
@@ -70,10 +70,10 @@ export default defineCommand({
             ...dbArgs,
             observation: { type: "string", required: true, description: "Observation ID" },
           },
-          run({ args }) {
-            const obsxa = open(args.db);
+          async run({ args }) {
+            const obsxa = await open(args.db);
             try {
-              const rows = obsxa.relation.list(parseId(args.observation, "observation"));
+              const rows = await obsxa.relation.list(parseId(args.observation, "observation"));
               if (args.toon || args.json) return output(rows, args.toon);
               if (rows.length === 0) return consola.info("No relations found.");
               for (const row of rows) {
@@ -82,7 +82,7 @@ export default defineCommand({
                 );
               }
             } finally {
-              obsxa.close();
+              await obsxa.close();
             }
           },
         }),

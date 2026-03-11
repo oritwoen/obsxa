@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { Client } from "@libsql/client";
 import { parseTags } from "./mappers.ts";
 import type {
   Observation,
@@ -40,9 +40,9 @@ function rowToObservation(row: Record<string, unknown>): Observation {
   };
 }
 
-export function createSearchStore(sqlite: Database.Database) {
+export function createSearchStore(client: Client) {
   return {
-    search(query: string, projectId?: string, limit = 50): SearchResult[] {
+    async search(query: string, projectId?: string, limit = 50): Promise<SearchResult[]> {
       try {
         let sql = `
           SELECT o.*, fts.rank
@@ -50,7 +50,7 @@ export function createSearchStore(sqlite: Database.Database) {
           JOIN observations_fts fts ON o.id = fts.rowid
           WHERE observations_fts MATCH ?
         `;
-        const params: unknown[] = [query];
+        const params: Array<string | number> = [query];
 
         if (projectId) {
           sql += " AND o.project_id = ?";
@@ -60,7 +60,8 @@ export function createSearchStore(sqlite: Database.Database) {
         sql += " ORDER BY fts.rank LIMIT ?";
         params.push(limit);
 
-        const rows = sqlite.prepare(sql).all(...params) as Record<string, unknown>[];
+        const result = await client.execute({ sql, args: params });
+        const rows = result.rows as Record<string, unknown>[];
         return rows.map((row, index) => ({ observation: rowToObservation(row), rank: index + 1 }));
       } catch {
         let sql = `
@@ -69,7 +70,7 @@ export function createSearchStore(sqlite: Database.Database) {
           WHERE (title LIKE ? OR description LIKE ? OR tags LIKE ?)
         `;
         const like = `%${query}%`;
-        const params: unknown[] = [like, like, like];
+        const params: Array<string | number> = [like, like, like];
 
         if (projectId) {
           sql += " AND project_id = ?";
@@ -79,7 +80,8 @@ export function createSearchStore(sqlite: Database.Database) {
         sql += " ORDER BY created_at DESC LIMIT ?";
         params.push(limit);
 
-        const rows = sqlite.prepare(sql).all(...params) as Record<string, unknown>[];
+        const result = await client.execute({ sql, args: params });
+        const rows = result.rows as Record<string, unknown>[];
         return rows.map((row, index) => ({ observation: rowToObservation(row), rank: index + 1 }));
       }
     },

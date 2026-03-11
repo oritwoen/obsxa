@@ -55,13 +55,13 @@ pnpm add ai zod
 ```ts
 import { createObsxa } from "obsxa";
 
-const obsxa = createObsxa({ db: "./research.db" });
+const obsxa = await createObsxa({ db: "./research.db" });
 
 // Create a project
-obsxa.project.add({ id: "sensor-data", name: "Sensor Analysis" });
+await obsxa.project.add({ id: "sensor-data", name: "Sensor Analysis" });
 
 // Record observations
-const o1 = obsxa.observation.add({
+const o1 = await obsxa.observation.add({
   projectId: "sensor-data",
   title: "Temperature spike at station 7",
   description: "Unusual 3σ deviation from baseline",
@@ -73,7 +73,7 @@ const o1 = obsxa.observation.add({
   context: JSON.stringify({ instrument: "DHT22", location: "lab-3", ambient: 21.0 }),
 });
 
-const o2 = obsxa.observation.add({
+const o2 = await obsxa.observation.add({
   projectId: "sensor-data",
   title: "Humidity drop correlates with spike",
   source: "station-7-humidity",
@@ -82,34 +82,34 @@ const o2 = obsxa.observation.add({
 });
 
 // Seen again — increment frequency
-obsxa.observation.incrementFrequency(o1.id);
+await obsxa.observation.incrementFrequency(o1.id);
 
 // Connect related observations
-obsxa.relation.add({
+await obsxa.relation.add({
   fromObservationId: o2.id,
   toObservationId: o1.id,
   type: "supports",
 });
 
 // Group them
-const cluster = obsxa.cluster.add({
+const cluster = await obsxa.cluster.add({
   projectId: "sensor-data",
   name: "Station 7 anomalies",
 });
-obsxa.cluster.addMember(cluster.id, o1.id);
-obsxa.cluster.addMember(cluster.id, o2.id);
+await obsxa.cluster.addMember(cluster.id, o1.id);
+await obsxa.cluster.addMember(cluster.id, o2.id);
 
 // Promote to hypothesis when ready
-obsxa.observation.promote(o1.id, "hypxa:sensor-data:1");
+await obsxa.observation.promote(o1.id, "hypxa:sensor-data:1");
 
 // Analysis
-const frequent = obsxa.analysis.frequent("sensor-data"); // observations seen multiple times
-const unpromoted = obsxa.analysis.unpromoted("sensor-data"); // candidates for hypotheses
-const isolated = obsxa.analysis.isolated("sensor-data"); // observations with no relations
-const convergent = obsxa.analysis.convergent("sensor-data"); // confirmed by multiple sources
-const stats = obsxa.analysis.stats("sensor-data"); // project-level summary
+const frequent = await obsxa.analysis.frequent("sensor-data"); // observations seen multiple times
+const unpromoted = await obsxa.analysis.unpromoted("sensor-data"); // candidates for hypotheses
+const isolated = await obsxa.analysis.isolated("sensor-data"); // observations with no relations
+const convergent = await obsxa.analysis.convergent("sensor-data"); // confirmed by multiple sources
+const stats = await obsxa.analysis.stats("sensor-data"); // project-level summary
 
-obsxa.close();
+await obsxa.close();
 ```
 
 ### CLI
@@ -415,12 +415,13 @@ pnpm test:run    # vitest --run
 You can configure startup behavior:
 
 ```ts
-createObsxa({
+const obsxa = await createObsxa({
   db: "./obsxa.db",
   autoMigrate: true, // default
   autoBackup: true, // default
   backupDir: "./backups",
 });
+await obsxa.close();
 ```
 
 ## License

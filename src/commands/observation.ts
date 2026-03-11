@@ -93,7 +93,7 @@ export default defineCommand({
             uncertainty: { type: "string", description: "Uncertainty 0-100" },
             reproducibility: { type: "string", description: "Reproducibility hint" },
           },
-          run({ args }) {
+          async run({ args }) {
             if (args.type && !observationTypes.includes(args.type as ObservationType)) {
               consola.error(
                 `Invalid type "${args.type}". Must be one of: ${observationTypes.join(", ")}`,
@@ -107,9 +107,9 @@ export default defineCommand({
               process.exit(1);
             }
 
-            const obsxa = open(args.db);
+            const obsxa = await open(args.db);
             try {
-              const observation = obsxa.observation.add({
+              const observation = await obsxa.observation.add({
                 projectId: args.project,
                 title: args.title,
                 description: args.description,
@@ -132,7 +132,7 @@ export default defineCommand({
               if (args.toon || args.json) return output(observation, args.toon);
               consola.success(`Observation #${observation.id} created: ${observation.title}`);
             } finally {
-              obsxa.close();
+              await obsxa.close();
             }
           },
         }),
@@ -150,19 +150,19 @@ export default defineCommand({
               description: "Path to JSON file with observation records",
             },
           },
-          run({ args }) {
+          async run({ args }) {
             const records = readDataFile<ObservationImportRecord[]>(args.file);
             if (!Array.isArray(records)) {
               consola.error("Import file must contain a JSON array");
               process.exit(1);
             }
-            const obsxa = open(args.db);
+            const obsxa = await open(args.db);
             try {
-              const imported = obsxa.observation.addMany(records);
+              const imported = await obsxa.observation.addMany(records);
               if (args.toon || args.json) return output(imported, args.toon);
               consola.success(`Imported ${imported.length} observations`);
             } finally {
-              obsxa.close();
+              await obsxa.close();
             }
           },
         }),
@@ -178,7 +178,7 @@ export default defineCommand({
             status: { type: "string", description: "Optional status filter" },
             type: { type: "string", description: "Optional type filter" },
           },
-          run({ args }) {
+          async run({ args }) {
             if (args.status && !statuses.includes(args.status as ObservationStatus)) {
               consola.error(
                 `Invalid status "${args.status}". Must be one of: ${statuses.join(", ")}`,
@@ -192,15 +192,15 @@ export default defineCommand({
               process.exit(1);
             }
 
-            const obsxa = open(args.db);
+            const obsxa = await open(args.db);
             try {
-              const rows = obsxa.observation.list(args.project, {
+              const rows = await obsxa.observation.list(args.project, {
                 status: args.status as ObservationStatus | undefined,
                 type: args.type as ObservationType | undefined,
               });
               output(rows, args.toon);
             } finally {
-              obsxa.close();
+              await obsxa.close();
             }
           },
         }),
@@ -218,19 +218,19 @@ export default defineCommand({
               description: "Path to JSON file with update records",
             },
           },
-          run({ args }) {
+          async run({ args }) {
             const records = readDataFile<ObservationBatchUpdateRecord[]>(args.file);
             if (!Array.isArray(records)) {
               consola.error("Batch-update file must contain a JSON array");
               process.exit(1);
             }
-            const obsxa = open(args.db);
+            const obsxa = await open(args.db);
             try {
-              const updated = obsxa.observation.updateMany(records);
+              const updated = await obsxa.observation.updateMany(records);
               if (args.toon || args.json) return output(updated, args.toon);
               consola.success(`Updated ${updated.length} observations`);
             } finally {
-              obsxa.close();
+              await obsxa.close();
             }
           },
         }),
@@ -244,10 +244,10 @@ export default defineCommand({
             ...dbArgs,
             id: { type: "positional", required: true, description: "Observation ID" },
           },
-          run({ args }) {
-            const obsxa = open(args.db);
+          async run({ args }) {
+            const obsxa = await open(args.db);
             try {
-              const observation = obsxa.observation.get(parseId(args.id, "id"));
+              const observation = await obsxa.observation.get(parseId(args.id, "id"));
               if (!observation) {
                 consola.error(`Observation #${args.id} not found`);
                 process.exit(1);
@@ -257,7 +257,7 @@ export default defineCommand({
                 `#${observation.id} [${observation.status}] f=${observation.frequency} triage=${observation.triageScore} ${observation.title}`,
               );
             } finally {
-              obsxa.close();
+              await obsxa.close();
             }
           },
         }),
@@ -271,17 +271,17 @@ export default defineCommand({
             ...dbArgs,
             id: { type: "positional", required: true, description: "Observation ID" },
           },
-          run({ args }) {
-            const obsxa = open(args.db);
+          async run({ args }) {
+            const obsxa = await open(args.db);
             try {
-              const rows = obsxa.observation.transitions(parseId(args.id, "id"));
+              const rows = await obsxa.observation.transitions(parseId(args.id, "id"));
               if (args.toon || args.json) return output(rows, args.toon);
               if (rows.length === 0) return consola.info("No transitions found.");
               for (const row of rows) {
                 consola.log(`#${row.id} ${row.fromStatus} -> ${row.toStatus} (${row.reasonCode})`);
               }
             } finally {
-              obsxa.close();
+              await obsxa.close();
             }
           },
         }),
@@ -295,10 +295,10 @@ export default defineCommand({
             ...dbArgs,
             id: { type: "positional", required: true, description: "Observation ID" },
           },
-          run({ args }) {
-            const obsxa = open(args.db);
+          async run({ args }) {
+            const obsxa = await open(args.db);
             try {
-              const rows = obsxa.observation.edits(parseId(args.id, "id"));
+              const rows = await obsxa.observation.edits(parseId(args.id, "id"));
               if (args.toon || args.json) return output(rows, args.toon);
               if (rows.length === 0) return consola.info("No edits found.");
               for (const row of rows) {
@@ -307,7 +307,7 @@ export default defineCommand({
                 );
               }
             } finally {
-              obsxa.close();
+              await obsxa.close();
             }
           },
         }),
@@ -323,7 +323,7 @@ export default defineCommand({
             status: { type: "string", description: "Status filter" },
             type: { type: "string", description: "Type filter" },
           },
-          run({ args }) {
+          async run({ args }) {
             if (args.status && !statuses.includes(args.status as ObservationStatus)) {
               consola.error(
                 `Invalid status "${args.status}". Must be one of: ${statuses.join(", ")}`,
@@ -337,9 +337,9 @@ export default defineCommand({
               process.exit(1);
             }
 
-            const obsxa = open(args.db);
+            const obsxa = await open(args.db);
             try {
-              const rows = obsxa.observation.list(args.project, {
+              const rows = await obsxa.observation.list(args.project, {
                 status: args.status as ObservationStatus | undefined,
                 type: args.type as ObservationType | undefined,
               });
@@ -351,7 +351,7 @@ export default defineCommand({
                 );
               }
             } finally {
-              obsxa.close();
+              await obsxa.close();
             }
           },
         }),
@@ -382,7 +382,7 @@ export default defineCommand({
             uncertainty: { type: "string", description: "Uncertainty" },
             reproducibility: { type: "string", description: "Reproducibility hint" },
           },
-          run({ args }) {
+          async run({ args }) {
             if (args.type && !observationTypes.includes(args.type as ObservationType)) {
               consola.error(
                 `Invalid type "${args.type}". Must be one of: ${observationTypes.join(", ")}`,
@@ -396,9 +396,9 @@ export default defineCommand({
               process.exit(1);
             }
 
-            const obsxa = open(args.db);
+            const obsxa = await open(args.db);
             try {
-              const result = obsxa.observation.update(parseId(args.id, "id"), {
+              const result = await obsxa.observation.update(parseId(args.id, "id"), {
                 title: args.title,
                 description: args.description,
                 type: args.type as ObservationType | undefined,
@@ -420,7 +420,7 @@ export default defineCommand({
               if (args.toon || args.json) return output(result, args.toon);
               consola.success(`Observation #${result.id} updated`);
             } finally {
-              obsxa.close();
+              await obsxa.close();
             }
           },
         }),
@@ -440,7 +440,7 @@ export default defineCommand({
             },
             note: { type: "string", description: "Optional reason note" },
           },
-          run({ args }) {
+          async run({ args }) {
             if (!reasonCodes.includes(args.reason as ObservationStatusReasonCode)) {
               consola.error(
                 `Invalid reason "${args.reason}". Must be one of: ${reasonCodes.join(", ")}`,
@@ -448,16 +448,16 @@ export default defineCommand({
               process.exit(1);
             }
 
-            const obsxa = open(args.db);
+            const obsxa = await open(args.db);
             try {
-              const result = obsxa.observation.dismiss(parseId(args.id, "id"), {
+              const result = await obsxa.observation.dismiss(parseId(args.id, "id"), {
                 reasonCode: args.reason as ObservationStatusReasonCode,
                 reasonNote: args.note,
               });
               if (args.toon || args.json) return output(result, args.toon);
               consola.success(`Observation #${result.id} dismissed`);
             } finally {
-              obsxa.close();
+              await obsxa.close();
             }
           },
         }),
@@ -477,23 +477,23 @@ export default defineCommand({
             },
             note: { type: "string", description: "Optional reason note" },
           },
-          run({ args }) {
+          async run({ args }) {
             if (!reasonCodes.includes(args.reason as ObservationStatusReasonCode)) {
               consola.error(
                 `Invalid reason "${args.reason}". Must be one of: ${reasonCodes.join(", ")}`,
               );
               process.exit(1);
             }
-            const obsxa = open(args.db);
+            const obsxa = await open(args.db);
             try {
-              const result = obsxa.observation.archive(parseId(args.id, "id"), {
+              const result = await obsxa.observation.archive(parseId(args.id, "id"), {
                 reasonCode: args.reason as ObservationStatusReasonCode,
                 reasonNote: args.note,
               });
               if (args.toon || args.json) return output(result, args.toon);
               consola.success(`Observation #${result.id} archived`);
             } finally {
-              obsxa.close();
+              await obsxa.close();
             }
           },
         }),
@@ -507,14 +507,14 @@ export default defineCommand({
             ...dbArgs,
             id: { type: "positional", required: true, description: "Observation ID" },
           },
-          run({ args }) {
-            const obsxa = open(args.db);
+          async run({ args }) {
+            const obsxa = await open(args.db);
             try {
-              const result = obsxa.observation.incrementFrequency(parseId(args.id, "id"));
+              const result = await obsxa.observation.incrementFrequency(parseId(args.id, "id"));
               if (args.toon || args.json) return output(result, args.toon);
               consola.success(`Observation #${result.id} frequency is now ${result.frequency}`);
             } finally {
-              obsxa.close();
+              await obsxa.close();
             }
           },
         }),

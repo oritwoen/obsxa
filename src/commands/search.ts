@@ -10,22 +10,22 @@ export default defineCommand({
     project: { type: "string", description: "Project ID" },
     limit: { type: "string", description: "Max results" },
   },
-  run({ args }) {
+  async run({ args }) {
     const limit = args.limit === undefined ? undefined : parseId(args.limit, "limit");
     if (limit !== undefined && limit < 1) {
       consola.error("--limit must be at least 1");
       process.exit(1);
     }
-    const obsxa = open(args.db);
+    const obsxa = await open(args.db);
     try {
-      const rows = obsxa.search.search(args.query, args.project, limit);
+      const rows = await obsxa.search.search(args.query, args.project, limit);
       if (args.toon || args.json) return output(rows, args.toon);
       if (rows.length === 0) return consola.info("No matches found.");
       for (const row of rows) {
         consola.log(`[${row.rank}] #${row.observation.id} ${row.observation.title}`);
       }
     } finally {
-      obsxa.close();
+      await obsxa.close();
     }
   },
 });

@@ -13,11 +13,11 @@ export default defineCommand({
       description: "Hypothesis reference (e.g. hypxa:project:3)",
     },
   },
-  run({ args }) {
-    const obsxa = open(args.db);
+  async run({ args }) {
+    const obsxa = await open(args.db);
     try {
       const id = parseId(args.id, "id");
-      const observation = obsxa.observation.get(id);
+      const observation = await obsxa.observation.get(id);
       if (!observation) {
         consola.error(`Observation #${id} not found`);
         process.exit(1);
@@ -29,11 +29,11 @@ export default defineCommand({
         process.exit(1);
       }
 
-      const result = obsxa.observation.promote(id, args.ref);
+      const result = await obsxa.observation.promote(id, args.ref);
       if (args.toon || args.json) return output(result, args.toon);
       consola.success(`Observation #${result.id} promoted to ${result.promotedTo}`);
     } finally {
-      obsxa.close();
+      await obsxa.close();
     }
   },
 });

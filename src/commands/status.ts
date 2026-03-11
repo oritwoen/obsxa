@@ -8,16 +8,16 @@ export default defineCommand({
     ...dbArgs,
     projectId: { type: "positional", required: true, description: "Project ID" },
   },
-  run({ args }) {
-    const obsxa = open(args.db);
+  async run({ args }) {
+    const obsxa = await open(args.db);
     try {
-      const stats = obsxa.analysis.stats(args.projectId);
+      const stats = await obsxa.analysis.stats(args.projectId);
       if (args.toon || args.json) return output(stats, args.toon);
       consola.log(
         `total=${stats.total} active=${stats.active} promoted=${stats.promoted} dismissed=${stats.dismissed} archived=${stats.archived} avgConfidence=${stats.avgConfidence} totalClusters=${stats.totalClusters}`,
       );
     } finally {
-      obsxa.close();
+      await obsxa.close();
     }
   },
 });

@@ -1,7 +1,7 @@
 import { integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
-import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
+import type { LibSQLDatabase } from "drizzle-orm/libsql";
 
-export type ObsxaDB = BetterSQLite3Database;
+export type ObsxaDB = LibSQLDatabase;
 
 export const projects = sqliteTable("projects", {
   id: text("id").primaryKey(),

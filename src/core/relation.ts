@@ -6,19 +6,19 @@ import type { AddRelation, ObservationRelation } from "../types.ts";
 
 export function createRelationStore(db: ObsxaDB) {
   return {
-    add(input: AddRelation): ObservationRelation {
+    async add(input: AddRelation): Promise<ObservationRelation> {
       if (input.fromObservationId === input.toObservationId) {
         throw new Error("Cannot create self-reference relation");
       }
 
-      const fromObservation = db
+      const fromObservation = await db
         .select({ id: observations.id, projectId: observations.projectId })
         .from(observations)
         .where(eq(observations.id, input.fromObservationId))
         .get();
       if (!fromObservation) throw new Error(`Observation #${input.fromObservationId} not found`);
 
-      const toObservation = db
+      const toObservation = await db
         .select({ id: observations.id, projectId: observations.projectId })
         .from(observations)
         .where(eq(observations.id, input.toObservationId))
@@ -36,7 +36,7 @@ export function createRelationStore(db: ObsxaDB) {
         throw new Error("Relation confidence must be between 0 and 100");
       }
 
-      const existing = db
+      const existing = await db
         .select()
         .from(observationRelations)
         .where(
@@ -49,37 +49,59 @@ export function createRelationStore(db: ObsxaDB) {
         .get();
       if (existing) return toRelation(existing);
 
-      const row = db
-        .insert(observationRelations)
-        .values({
-          fromObservationId: input.fromObservationId,
-          toObservationId: input.toObservationId,
-          type: input.type,
-          confidence,
-          notes: input.notes,
-        })
-        .returning()
-        .get();
+      let row: typeof observationRelations.$inferSelect;
+      try {
+        row = await db
+          .insert(observationRelations)
+          .values({
+            fromObservationId: input.fromObservationId,
+            toObservationId: input.toObservationId,
+            type: input.type,
+            confidence,
+            notes: input.notes,
+          })
+          .returning()
+          .get();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!/unique|constraint/i.test(message)) {
+          throw error;
+        }
+        const concurrent = await db
+          .select()
+          .from(observationRelations)
+          .where(
+            and(
+              eq(observationRelations.fromObservationId, input.fromObservationId),
+              eq(observationRelations.toObservationId, input.toObservationId),
+              eq(observationRelations.type, input.type),
+            ),
+          )
+          .get();
+        if (!concurrent) throw error;
+        return toRelation(concurrent);
+      }
 
       return toRelation(row);
     },
 
-    list(observationId: number): ObservationRelation[] {
-      return db
-        .select()
-        .from(observationRelations)
-        .where(
-          or(
-            eq(observationRelations.fromObservationId, observationId),
-            eq(observationRelations.toObservationId, observationId),
-          ),
-        )
-        .all()
-        .map(toRelation);
+    async list(observationId: number): Promise<ObservationRelation[]> {
+      return (
+        await db
+          .select()
+          .from(observationRelations)
+          .where(
+            or(
+              eq(observationRelations.fromObservationId, observationId),
+              eq(observationRelations.toObservationId, observationId),
+            ),
+          )
+          .all()
+      ).map(toRelation);
     },
 
-    remove(id: number): void {
-      db.delete(observationRelations).where(eq(observationRelations.id, id)).run();
+    async remove(id: number): Promise<void> {
+      await db.delete(observationRelations).where(eq(observationRelations.id, id)).run();
     },
   };
 }

@@ -13,7 +13,7 @@ export default defineCommand({
     limit: { type: "string", description: "Max rows (default: 25)" },
     sort: { type: "string", description: "triage|recent (default: triage)" },
   },
-  run({ args }) {
+  async run({ args }) {
     const sort = (args.sort ?? "triage") as TriageSort;
     if (!sortModes.includes(sort)) {
       consola.error(`Invalid sort "${sort}". Must be one of: ${sortModes.join(", ")}`);
@@ -26,9 +26,9 @@ export default defineCommand({
       process.exit(1);
     }
 
-    const obsxa = open(args.db);
+    const obsxa = await open(args.db);
     try {
-      const rows = obsxa.analysis.triage(args.project, limit, sort);
+      const rows = await obsxa.analysis.triage(args.project, limit, sort);
       if (args.toon || args.json) return output(rows, args.toon);
       if (rows.length === 0) return consola.info("No active observations found.");
       for (const row of rows) {
@@ -37,7 +37,7 @@ export default defineCommand({
         );
       }
     } finally {
-      obsxa.close();
+      await obsxa.close();
     }
   },
 });
