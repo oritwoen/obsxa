@@ -1,6 +1,8 @@
 import { defineCommand } from "citty";
 import { consola } from "consola";
 import { backupDatabase, restoreDatabase } from "../backup.ts";
+import { output } from "./_db.ts";
+import { getDefaultDbPath } from "../core/db-path.ts";
 
 export default defineCommand({
   meta: { name: "backup", description: "Backup or restore obsxa SQLite database files" },
@@ -10,15 +12,19 @@ export default defineCommand({
         defineCommand({
           meta: { name: "create", description: "Create database backup (db, wal, shm)" },
           args: {
-            db: { type: "string", default: "./obsxa.db", description: "Path to SQLite database" },
+            db: {
+              type: "string",
+              description: "Path to SQLite database",
+            },
             out: { type: "string", description: "Backup base path (without -wal/-shm suffixes)" },
             json: { type: "boolean", default: false, description: "Output as JSON" },
+            toon: { type: "boolean", default: false, description: "Output as TOON" },
           },
           run({ args }) {
             try {
-              const result = backupDatabase(args.db, args.out);
-              if (args.json) {
-                process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+              const result = backupDatabase(args.db ?? getDefaultDbPath(), args.out);
+              if (args.json || args.toon) {
+                output(result, args.toon);
                 return;
               }
               consola.success(`Backup created: ${result.basePath}`);
@@ -37,7 +43,6 @@ export default defineCommand({
           args: {
             db: {
               type: "string",
-              default: "./obsxa.db",
               description: "Target SQLite database path",
             },
             from: {
@@ -46,12 +51,13 @@ export default defineCommand({
               description: "Backup base path to restore from",
             },
             json: { type: "boolean", default: false, description: "Output as JSON" },
+            toon: { type: "boolean", default: false, description: "Output as TOON" },
           },
           run({ args }) {
             try {
-              const result = restoreDatabase(args.db, args.from);
-              if (args.json) {
-                process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+              const result = restoreDatabase(args.db ?? getDefaultDbPath(), args.from);
+              if (args.json || args.toon) {
+                output(result, args.toon);
                 return;
               }
               consola.success(`Database restored from: ${result.restoredFrom}`);

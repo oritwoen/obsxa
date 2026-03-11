@@ -1,12 +1,11 @@
-import { isAbsolute } from "node:path";
 import { tool } from "ai";
 import { z } from "zod/v4";
+import { getDefaultDbPath } from "./core/db-path.ts";
 import { createObsxa } from "./index.ts";
 import type { ObsxaInstance } from "./index.ts";
 
 function sanitizeDbPath(path?: string): string {
-  const dbPath = path ?? "./obsxa.db";
-  if (isAbsolute(dbPath)) throw new Error("Absolute database paths are not allowed");
+  const dbPath = path ?? getDefaultDbPath();
   if (dbPath.includes("..")) throw new Error("Database path must not contain '..'");
   if (!dbPath.endsWith(".db")) throw new Error("Database path must end with '.db'");
   return dbPath;

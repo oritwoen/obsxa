@@ -121,6 +121,15 @@ export function createObservationStore(db: ObsxaDB) {
       return row ? toObservation(row) : null;
     },
 
+    getByInputHash(projectId: string, inputHash: string): Observation | null {
+      const row = db
+        .select()
+        .from(observations)
+        .where(and(eq(observations.projectId, projectId), eq(observations.inputHash, inputHash)))
+        .get();
+      return row ? toObservation(row) : null;
+    },
+
     list(
       projectId: string,
       opts?: {

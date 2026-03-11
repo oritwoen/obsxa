@@ -6,6 +6,7 @@ import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { createAnalysisStore } from "./core/analysis.ts";
 import { createClusterStore } from "./core/cluster.ts";
+import { getDefaultDbPath } from "./core/db-path.ts";
 import { createDedupStore } from "./core/dedup.ts";
 import { createObservationStore } from "./core/observation.ts";
 import { createProjectStore } from "./core/project.ts";
@@ -50,6 +51,9 @@ export type {
   TransitionObservation,
   UpdateObservation,
 } from "./types.ts";
+
+export { createObsxaPlugin } from "./opencode.ts";
+export type { ObsxaPluginOptions } from "./opencode.ts";
 
 function findMigrationsFolder(): string {
   const start = dirname(fileURLToPath(import.meta.url));
@@ -123,6 +127,7 @@ CREATE INDEX IF NOT EXISTS idx_observations_status ON observations(status);
 CREATE INDEX IF NOT EXISTS idx_observations_type ON observations(type);
 CREATE INDEX IF NOT EXISTS idx_observations_source_type ON observations(source_type);
 CREATE INDEX IF NOT EXISTS idx_observations_triage ON observations(triage_score);
+CREATE INDEX IF NOT EXISTS idx_observations_project_input_hash ON observations(project_id, input_hash);
 CREATE INDEX IF NOT EXISTS idx_rel_from ON observation_relations(from_observation_id);
 CREATE INDEX IF NOT EXISTS idx_rel_to ON observation_relations(to_observation_id);
 CREATE INDEX IF NOT EXISTS idx_rel_type ON observation_relations(type);
@@ -189,14 +194,19 @@ export interface ObsxaInstance {
  * obsxa.close()
  * ```
  */
-export function createObsxa(options: ObsxaOptions = { db: "./obsxa.db" }): ObsxaInstance {
+export function createObsxa(options: ObsxaOptions = {}): ObsxaInstance {
+  const dbPath: string = options.db ?? getDefaultDbPath();
   const resolved = {
     autoMigrate: options.autoMigrate ?? true,
     autoBackup: options.autoBackup ?? true,
     backupDir: options.backupDir,
   };
 
-  const sqlite = new Database(options.db);
+  if (dbPath !== ":memory:") {
+    mkdirSync(dirname(dbPath), { recursive: true });
+  }
+
+  const sqlite = new Database(dbPath);
   sqlite.pragma("journal_mode = WAL");
   sqlite.pragma("foreign_keys = ON");
 
@@ -215,9 +225,9 @@ export function createObsxa(options: ObsxaOptions = { db: "./obsxa.db" }): Obsxa
     );
   }
 
-  if (needsMigration && shouldBackup(options.db, resolved.autoBackup)) {
-    const backupPath = makeBackupPath(options.db, resolved.backupDir);
-    backupDatabase(options.db, backupPath);
+  if (needsMigration && shouldBackup(dbPath, resolved.autoBackup)) {
+    const backupPath = makeBackupPath(dbPath, resolved.backupDir);
+    backupDatabase(dbPath, backupPath);
   }
 
   const db = drizzle(sqlite);

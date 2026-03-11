@@ -1,7 +1,7 @@
 /** Configuration for {@link createObsxa}. */
 export interface ObsxaOptions {
-  /** Path to SQLite database file, or `:memory:` for in-memory. */
-  db: string;
+  /** Path to SQLite database file, or `:memory:` for in-memory. Defaults to XDG data directory. */
+  db?: string;
   /** Run schema migrations on open. @default true */
   autoMigrate?: boolean;
   /** Back up database before migration. @default true */

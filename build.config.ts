@@ -5,5 +5,10 @@ export default defineBuildConfig({
   rollup: {
     emitCJS: false,
   },
-  entries: [{ type: "bundle", input: ["./src/index.ts", "./src/cli.ts", "./src/ai.ts"] }],
+  entries: [
+    {
+      type: "bundle",
+      input: ["./src/index.ts", "./src/cli.ts", "./src/ai.ts", "./src/opencode.ts"],
+    },
+  ],
 });
