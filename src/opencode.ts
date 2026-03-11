@@ -61,7 +61,7 @@ const TRACKED_EVENTS: Record<string, "artifact" | "pattern" | "measurement" | "c
 const MAX_HASH_CACHE_SIZE = 2000;
 const MAX_SESSION_CACHE_SIZE = 1000;
 
-function getCacheValue(cache: Map<string, number>, key: string): number | undefined {
+function getCacheValue<T>(cache: Map<string, T>, key: string): T | undefined {
   const value = cache.get(key);
   if (value === undefined) return undefined;
   cache.delete(key);
@@ -69,10 +69,10 @@ function getCacheValue(cache: Map<string, number>, key: string): number | undefi
   return value;
 }
 
-function setCacheValue(
-  cache: Map<string, number>,
+function setCacheValue<T>(
+  cache: Map<string, T>,
   key: string,
-  value: number,
+  value: T,
   maxSize: number,
 ): void {
   if (cache.has(key)) {
@@ -135,31 +135,75 @@ function logHookError(scope: string, err: unknown): void {
   console.warn(`[obsxa] ${scope} hook error`, err);
 }
 
+function isSqliteConstraintError(error: unknown): boolean {
+  let current: unknown = error;
+  while (current) {
+    const obj = current as {
+      message?: unknown;
+      code?: unknown;
+      rawCode?: unknown;
+      extendedCode?: unknown;
+      cause?: unknown;
+    };
+    const message = typeof obj.message === "string" ? obj.message : String(obj.message ?? "");
+    const code = typeof obj.code === "string" ? obj.code : String(obj.code ?? "");
+    const rawCode = String(obj.rawCode ?? "");
+    const extendedCode =
+      typeof obj.extendedCode === "string" ? obj.extendedCode : String(obj.extendedCode ?? "");
+    if (
+      message.includes("UNIQUE constraint") ||
+      message.includes("SQLITE_CONSTRAINT") ||
+      code.includes("SQLITE_CONSTRAINT") ||
+      extendedCode.includes("SQLITE_CONSTRAINT") ||
+      rawCode === "1555"
+    ) {
+      return true;
+    }
+    current = obj.cause;
+  }
+  return false;
+}
+
 export function createObsxaPlugin(options?: ObsxaPluginOptions): Plugin {
   return async (input: PluginInput): Promise<Hooks> => {
     const db = options?.db ?? getDefaultDbPath();
     const obsxa = await createObsxa({ db });
     let closed = false;
 
-    const projectId = options?.projectId ?? input.project.id;
-    const projectName = options?.projectName ?? projectId;
+    const closeOnInitError = async () => {
+      if (closed) return;
+      closed = true;
+      try {
+        await obsxa.close();
+      } catch (err) {
+        logHookError("init.close", err);
+      }
+    };
 
-    if (!(await obsxa.project.get(projectId))) {
-      await obsxa.project.add({ id: projectId, name: projectName });
-    }
+    try {
+      const projectId = options?.projectId ?? input.project.id;
+      const projectName = options?.projectName ?? projectId;
+      let latestMessageBuffer = "";
 
-    let latestMessageBuffer = "";
-    const hashCache = new Map<string, number>();
-    // sessionID -> message observation ID (for derived_from relations)
-    const sessionMessageObs = new Map<string, number>();
+      try {
+        await obsxa.project.add({ id: projectId, name: projectName });
+      } catch (error) {
+        if (!isSqliteConstraintError(error)) {
+          throw error;
+        }
+      }
 
-    return {
-      destroy: async () => {
+      const latestMessageBufferBySession = new Map<string, string>();
+      const hashCache = new Map<string, number>();
+      const sessionMessageObs = new Map<string, number>();
+
+      return {
+        destroy: async () => {
         if (closed) return;
         closed = true;
         hashCache.clear();
         sessionMessageObs.clear();
-        latestMessageBuffer = "";
+        latestMessageBufferBySession.clear();
         try {
           await obsxa.close();
         } catch (err) {
@@ -185,8 +229,11 @@ export function createObsxaPlugin(options?: ObsxaPluginOptions): Plugin {
             .trim();
 
           if (text.length < 20) return;
-
           latestMessageBuffer = text;
+
+          if (msgInput.sessionID) {
+            setCacheValue(latestMessageBufferBySession, msgInput.sessionID, text, MAX_SESSION_CACHE_SIZE);
+          }
 
           const msgObj = output.message as { summary?: { title?: string } } | null | undefined;
           const title = (msgObj?.summary?.title ?? text.slice(0, 100)).slice(0, 200);
@@ -197,6 +244,9 @@ export function createObsxaPlugin(options?: ObsxaPluginOptions): Plugin {
           const existingId = await findByHash(obsxa, projectId, hash, hashCache);
           if (existingId !== undefined) {
             await obsxa.observation.incrementFrequency(existingId);
+            if (msgInput.sessionID) {
+              setCacheValue(sessionMessageObs, msgInput.sessionID, existingId, MAX_SESSION_CACHE_SIZE);
+            }
             return;
           }
 
@@ -369,10 +419,11 @@ export function createObsxaPlugin(options?: ObsxaPluginOptions): Plugin {
           // Always push agent instruction
           sysOutput.system.push(`<obsxa-instruction>\n${AGENT_INSTRUCTION}\n</obsxa-instruction>`);
 
-          // Use buffered message text or fall back to project name
-          const query = latestMessageBuffer || projectName;
+          const query =
+            (_sysInput.sessionID
+              ? latestMessageBufferBySession.get(_sysInput.sessionID)
+              : latestMessageBuffer) ?? projectName;
 
-          // Cross-project search: pass undefined projectId
           const results = await obsxa.search.search(query, undefined, maxObs);
 
           if (results.length > 0) {
@@ -382,8 +433,12 @@ export function createObsxaPlugin(options?: ObsxaPluginOptions): Plugin {
         } catch (err) {
           logHookError("system.transform", err);
         }
-      },
-    };
+        },
+      };
+    } catch (error) {
+      await closeOnInitError();
+      throw error;
+    }
   };
 }
 

@@ -65,6 +65,10 @@ function systemInput(sessionID?: string): Parameters<SystemHook>[0] {
 }
 
 describe("createObsxaPlugin", () => {
+  afterEach(async () => {
+    await cleanupTrackedHooks();
+  });
+
   it("is a function", () => {
     expect(typeof createObsxaPlugin).toBe("function");
   });
@@ -77,6 +81,7 @@ describe("createObsxaPlugin", () => {
   it("plugin factory returns a Hooks object", async () => {
     const plugin = createObsxaPlugin({ db: ":memory:" });
     const hooks = await plugin({ project: { id: "test" }, directory: "/tmp", worktree: "/tmp" });
+    trackedHooks.push(hooks);
     expect(typeof hooks).toBe("object");
     expect(hooks).not.toBeNull();
   });
@@ -103,6 +108,7 @@ describe("createObsxaPlugin factory", () => {
       directory: "/tmp",
       worktree: "/tmp",
     });
+    trackedHooks.push(hooks);
 
     expect(hooks).toBeDefined();
     expect(typeof hooks).toBe("object");
@@ -110,7 +116,8 @@ describe("createObsxaPlugin factory", () => {
 
   it("ensures project exists after factory call", async () => {
     const plugin = createObsxaPlugin({ db: dbPath, projectId: "test-project" });
-    await plugin({ project: { id: "test-project" }, directory: "/tmp", worktree: "/tmp" });
+    const hooks = await plugin({ project: { id: "test-project" }, directory: "/tmp", worktree: "/tmp" });
+    trackedHooks.push(hooks);
 
     const obsxa = await createObsxa({ db: dbPath });
     const project = await obsxa.project.get("test-project");
@@ -123,15 +130,16 @@ describe("createObsxaPlugin factory", () => {
   it("is idempotent (no error on second call with same projectId)", async () => {
     const plugin = createObsxaPlugin({ db: dbPath, projectId: "my-project" });
 
-    await plugin({ project: { id: "my-project" }, directory: "/tmp", worktree: "/tmp" });
-    await expect(
-      plugin({ project: { id: "my-project" }, directory: "/tmp", worktree: "/tmp" }),
-    ).resolves.toBeDefined();
+    const hooks1 = await plugin({ project: { id: "my-project" }, directory: "/tmp", worktree: "/tmp" });
+    const hooks2 = await plugin({ project: { id: "my-project" }, directory: "/tmp", worktree: "/tmp" });
+    trackedHooks.push(hooks1, hooks2);
+    expect(hooks2).toBeDefined();
   });
 
   it("returns hooks object with expected keys", async () => {
     const plugin = createObsxaPlugin({ db: dbPath, projectId: "p1" });
     const hooks = await plugin({ project: { id: "p1" }, directory: "/tmp", worktree: "/tmp" });
+    trackedHooks.push(hooks);
 
     expect(hooks).toHaveProperty("chat.message");
     expect(hooks).toHaveProperty("tool.execute.after");
@@ -142,6 +150,7 @@ describe("createObsxaPlugin factory", () => {
   it("hook functions are callable async functions", async () => {
     const plugin = createObsxaPlugin({ db: dbPath, projectId: "p1" });
     const hooks = await plugin({ project: { id: "p1" }, directory: "/tmp", worktree: "/tmp" });
+    trackedHooks.push(hooks);
 
     expect(typeof hooks.destroy).toBe("function");
     expect(typeof hooks["chat.message"]).toBe("function");
@@ -153,6 +162,7 @@ describe("createObsxaPlugin factory", () => {
   it("destroy closes plugin resources without throwing", async () => {
     const plugin = createObsxaPlugin({ db: dbPath, projectId: "p1" });
     const hooks = await plugin({ project: { id: "p1" }, directory: "/tmp", worktree: "/tmp" });
+    trackedHooks.push(hooks);
 
     await expect(hooks.destroy?.()).resolves.toBeUndefined();
     await expect(hooks.destroy?.()).resolves.toBeUndefined();
@@ -160,7 +170,8 @@ describe("createObsxaPlugin factory", () => {
 
   it("uses input.project.id as default projectId when not provided in options", async () => {
     const plugin = createObsxaPlugin({ db: dbPath });
-    await plugin({ project: { id: "from-input" }, directory: "/tmp", worktree: "/tmp" });
+    const hooks = await plugin({ project: { id: "from-input" }, directory: "/tmp", worktree: "/tmp" });
+    trackedHooks.push(hooks);
 
     const obsxa = await createObsxa({ db: dbPath });
     const project = await obsxa.project.get("from-input");
@@ -171,7 +182,8 @@ describe("createObsxaPlugin factory", () => {
 
   it("uses projectId from options when provided", async () => {
     const plugin = createObsxaPlugin({ db: dbPath, projectId: "explicit-id" });
-    await plugin({ project: { id: "from-input" }, directory: "/tmp", worktree: "/tmp" });
+    const hooks = await plugin({ project: { id: "from-input" }, directory: "/tmp", worktree: "/tmp" });
+    trackedHooks.push(hooks);
 
     const obsxa = await createObsxa({ db: dbPath });
     const project = await obsxa.project.get("explicit-id");
@@ -182,7 +194,8 @@ describe("createObsxaPlugin factory", () => {
 
   it("uses projectName from options when provided", async () => {
     const plugin = createObsxaPlugin({ db: dbPath, projectId: "p1", projectName: "My Project" });
-    await plugin({ project: { id: "p1" }, directory: "/tmp", worktree: "/tmp" });
+    const hooks = await plugin({ project: { id: "p1" }, directory: "/tmp", worktree: "/tmp" });
+    trackedHooks.push(hooks);
 
     const obsxa = await createObsxa({ db: dbPath });
     const project = await obsxa.project.get("p1");
@@ -193,7 +206,8 @@ describe("createObsxaPlugin factory", () => {
 
   it("defaults projectName to projectId when not provided", async () => {
     const plugin = createObsxaPlugin({ db: dbPath, projectId: "p1" });
-    await plugin({ project: { id: "p1" }, directory: "/tmp", worktree: "/tmp" });
+    const hooks = await plugin({ project: { id: "p1" }, directory: "/tmp", worktree: "/tmp" });
+    trackedHooks.push(hooks);
 
     const obsxa = await createObsxa({ db: dbPath });
     const project = await obsxa.project.get("p1");
