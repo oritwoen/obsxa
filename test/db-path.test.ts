@@ -61,4 +61,10 @@ describe("getDefaultDbPath", () => {
       "Home directory must not be empty",
     );
   });
+
+  it("throws when home directory is whitespace only", () => {
+    expect(() => getDefaultDbPath({} as NodeJS.ProcessEnv, "   ", "linux")).toThrow(
+      "Home directory must not be empty",
+    );
+  });
 });

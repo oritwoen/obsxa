@@ -626,16 +626,15 @@ describe("system.transform hook", () => {
     const output = { system: [] as string[] };
     await hooks2["experimental.chat.system.transform"]!(systemInput(), output);
     const obsSection = output.system.find((s) => s.includes("## Recent Observations"));
-    if (obsSection) {
-      const count = obsSection
-        .split("\n")
-        .map((line) => line.trim())
-        .filter((line) =>
-          /^- \[(pattern|anomaly|measurement|correlation|artifact)\]\s+/.test(line),
-        ).length;
-      expect(count).toBeGreaterThan(0);
-      expect(count).toBeLessThanOrEqual(3);
-    }
+    expect(obsSection).toBeTruthy();
+    const count = obsSection!
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) =>
+        /^- \[(pattern|anomaly|measurement|correlation|artifact)\]\s+/.test(line),
+      ).length;
+    expect(count).toBeGreaterThan(0);
+    expect(count).toBeLessThanOrEqual(3);
   });
 
   it("respects maxInjectedChars option", async () => {
