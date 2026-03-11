@@ -38,14 +38,37 @@ function parseTags(tags?: string): string[] | undefined {
     .filter(Boolean);
 }
 
-function parseOptionalInt(value?: string, name = "value"): number | undefined {
-  if (!value) return undefined;
+export function parseOptionalInt(
+  value?: string,
+  name = "value",
+  opts?: { min?: number; max?: number },
+): number | undefined {
+  if (value === undefined) return undefined;
+  if (value.length === 0) {
+    consola.error(`--${name} must not be empty`);
+    process.exit(1);
+  }
   if (!/^\d+$/.test(value)) {
     consola.error(`--${name} must be an integer, got "${value}"`);
     process.exit(1);
   }
-  return Number(value);
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed)) {
+    consola.error(`--${name} must be a safe integer, got "${value}"`);
+    process.exit(1);
+  }
+  if (opts?.min !== undefined && parsed < opts.min) {
+    consola.error(`--${name} must be at least ${opts.min}, got "${value}"`);
+    process.exit(1);
+  }
+  if (opts?.max !== undefined && parsed > opts.max) {
+    consola.error(`--${name} must be at most ${opts.max}, got "${value}"`);
+    process.exit(1);
+  }
+  return parsed;
 }
+
+const percentRange = { min: 0, max: 100 };
 
 function readDataFile<T>(filePath: string): T {
   try {
@@ -116,7 +139,7 @@ export default defineCommand({
                 type: args.type as ObservationType | undefined,
                 source: args.source,
                 sourceType: args["source-type"] as SourceType | undefined,
-                confidence: parseOptionalInt(args.confidence, "confidence"),
+                confidence: parseOptionalInt(args.confidence, "confidence", percentRange),
                 tags: parseTags(args.tags),
                 data: args.data,
                 context: args.context,
@@ -124,9 +147,9 @@ export default defineCommand({
                 sourceRef: args["source-ref"],
                 collector: args.collector,
                 inputHash: args["input-hash"],
-                evidenceStrength: parseOptionalInt(args.evidence, "evidence"),
-                novelty: parseOptionalInt(args.novelty, "novelty"),
-                uncertainty: parseOptionalInt(args.uncertainty, "uncertainty"),
+                evidenceStrength: parseOptionalInt(args.evidence, "evidence", percentRange),
+                novelty: parseOptionalInt(args.novelty, "novelty", percentRange),
+                uncertainty: parseOptionalInt(args.uncertainty, "uncertainty", percentRange),
                 reproducibilityHint: args.reproducibility,
               });
               if (args.toon || args.json) return output(observation, args.toon);
@@ -369,7 +392,7 @@ export default defineCommand({
             type: { type: "string", description: "Type" },
             source: { type: "string", description: "Source" },
             "source-type": { type: "string", description: "Source type" },
-            confidence: { type: "string", description: "Confidence" },
+            confidence: { type: "string", description: "Confidence 0-100" },
             tags: { type: "string", description: "Comma-separated tags" },
             data: { type: "string", description: "Data payload" },
             context: { type: "string", description: "Observation conditions/environment (JSON)" },
@@ -377,9 +400,9 @@ export default defineCommand({
             "source-ref": { type: "string", description: "Source reference" },
             collector: { type: "string", description: "Collector identity" },
             "input-hash": { type: "string", description: "Input hash" },
-            evidence: { type: "string", description: "Evidence strength" },
-            novelty: { type: "string", description: "Novelty" },
-            uncertainty: { type: "string", description: "Uncertainty" },
+            evidence: { type: "string", description: "Evidence strength 0-100" },
+            novelty: { type: "string", description: "Novelty 0-100" },
+            uncertainty: { type: "string", description: "Uncertainty 0-100" },
             reproducibility: { type: "string", description: "Reproducibility hint" },
           },
           async run({ args }) {
@@ -404,7 +427,7 @@ export default defineCommand({
                 type: args.type as ObservationType | undefined,
                 source: args.source,
                 sourceType: args["source-type"] as SourceType | undefined,
-                confidence: parseOptionalInt(args.confidence, "confidence"),
+                confidence: parseOptionalInt(args.confidence, "confidence", percentRange),
                 tags: parseTags(args.tags),
                 data: args.data,
                 context: args.context,
@@ -412,9 +435,9 @@ export default defineCommand({
                 sourceRef: args["source-ref"],
                 collector: args.collector,
                 inputHash: args["input-hash"],
-                evidenceStrength: parseOptionalInt(args.evidence, "evidence"),
-                novelty: parseOptionalInt(args.novelty, "novelty"),
-                uncertainty: parseOptionalInt(args.uncertainty, "uncertainty"),
+                evidenceStrength: parseOptionalInt(args.evidence, "evidence", percentRange),
+                novelty: parseOptionalInt(args.novelty, "novelty", percentRange),
+                uncertainty: parseOptionalInt(args.uncertainty, "uncertainty", percentRange),
                 reproducibilityHint: args.reproducibility,
               });
               if (args.toon || args.json) return output(result, args.toon);
