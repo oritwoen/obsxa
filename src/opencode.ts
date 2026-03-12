@@ -12,12 +12,12 @@ export interface ObsxaPluginOptions {
 }
 
 type PluginInput = {
-  client: unknown;
+  client?: unknown;
   project: { id: string; [key: string]: unknown };
   directory: string;
   worktree: string;
-  serverUrl: URL;
-  $: unknown;
+  serverUrl?: URL;
+  $?: unknown;
 };
 
 type Hooks = {
