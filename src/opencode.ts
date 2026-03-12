@@ -11,29 +11,93 @@ export interface ObsxaPluginOptions {
   maxInjectedChars?: number;
 }
 
-// Inline OpenCode plugin types (no runtime dependency on @opencode-ai/plugin)
-// Source: /tmp/opencode/packages/plugin/src/index.ts
 type PluginInput = {
+  client: unknown;
   project: { id: string; [key: string]: unknown };
   directory: string;
   worktree: string;
-  [key: string]: unknown;
+  serverUrl: URL;
+  $: unknown;
 };
 
 type Hooks = {
   destroy?: () => Promise<void>;
+  event?: (input: { event: { type: string; properties: Record<string, unknown> } }) => Promise<void>;
+  config?: (input: unknown) => Promise<void>;
+  tool?: Record<string, unknown>;
+  auth?: unknown;
   "chat.message"?: (
-    input: { sessionID: string; agent?: string; model?: unknown; messageID?: string },
-    output: { message: unknown; parts: unknown[] },
+    input: {
+      sessionID: string;
+      agent?: string;
+      model?: { providerID: string; modelID: string };
+      messageID?: string;
+      variant?: string;
+    },
+    output: {
+      message: unknown;
+      parts: Array<{ type: string; text?: string; content?: string; [key: string]: unknown }>;
+    },
+  ) => Promise<void>;
+  "chat.params"?: (
+    input: {
+      sessionID: string;
+      agent: string;
+      model: unknown;
+      provider: { source: "env" | "config" | "custom" | "api"; info: unknown; options: Record<string, unknown> };
+      message: unknown;
+    },
+    output: { temperature: number; topP: number; topK: number; options: Record<string, unknown> },
+  ) => Promise<void>;
+  "chat.headers"?: (
+    input: {
+      sessionID: string;
+      agent: string;
+      model: unknown;
+      provider: { source: "env" | "config" | "custom" | "api"; info: unknown; options: Record<string, unknown> };
+      message: unknown;
+    },
+    output: { headers: Record<string, string> },
+  ) => Promise<void>;
+  "permission.ask"?: (
+    input: unknown,
+    output: { status: "ask" | "deny" | "allow" },
+  ) => Promise<void>;
+  "command.execute.before"?: (
+    input: { command: string; sessionID: string; arguments: string },
+    output: { parts: unknown[] },
+  ) => Promise<void>;
+  "tool.execute.before"?: (
+    input: { tool: string; sessionID: string; callID: string },
+    output: { args: unknown },
+  ) => Promise<void>;
+  "shell.env"?: (
+    input: { cwd: string; sessionID?: string; callID?: string },
+    output: { env: Record<string, string> },
   ) => Promise<void>;
   "tool.execute.after"?: (
     input: { tool: string; sessionID: string; callID: string; args: unknown },
     output: { title: string; output: string; metadata: unknown },
   ) => Promise<void>;
-  event?: (input: { event: { type: string; properties: unknown } }) => Promise<void>;
+  "experimental.chat.messages.transform"?: (
+    input: {},
+    output: { messages: Array<{ info: unknown; parts: unknown[] }> },
+  ) => Promise<void>;
   "experimental.chat.system.transform"?: (
     input: { sessionID?: string; model: unknown },
     output: { system: string[] },
+  ) => Promise<void>;
+  "experimental.session.compacting"?: (
+    input: { sessionID: string },
+    output: { context: string[]; prompt?: string },
+  ) => Promise<void>;
+  "experimental.text.complete"?: (
+    input: { sessionID: string; messageID: string; partID: string },
+    output: { text: string },
+  ) => Promise<void>;
+  "tool.definition"?: (
+    input: { toolID: string },
+    output: { description: string; parameters: unknown },
   ) => Promise<void>;
 };
 
@@ -126,12 +190,41 @@ function formatObservations(
   );
   let output = "## Recent Observations\n" + lines.join("\n");
   if (output.length > maxChars) {
+    if (maxChars <= 0) return "";
+    if (maxChars <= 3) return ".".repeat(maxChars);
     const chars = Array.from(output);
     const truncated = chars.slice(0, Math.max(0, maxChars - 3)).join("");
     const lastNewline = truncated.lastIndexOf("\n");
     output = (lastNewline > 0 ? truncated.slice(0, lastNewline) : truncated) + "...";
   }
   return output;
+}
+
+function sanitizeEventLabel(value: unknown): string {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed.length > 0) return trimmed;
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+
+  if (typeof value === "object" && value !== null) {
+    const record = value as Record<string, unknown>;
+    const path = record.path;
+    if (typeof path === "string") {
+      const trimmedPath = path.trim();
+      if (trimmedPath.length > 0) return trimmedPath;
+    }
+    const name = record.name;
+    if (typeof name === "string") {
+      const trimmedName = name.trim();
+      if (trimmedName.length > 0) return trimmedName;
+    }
+  }
+
+  return "unknown";
 }
 
 function logHookError(scope: string, err: unknown): void {
@@ -377,11 +470,11 @@ export function createObsxaPlugin(options?: ObsxaPluginOptions): Plugin {
             let title: string;
             let source: string;
             if (evt.type === "file.edited") {
-              const file = (props.file as string) ?? "unknown";
+              const file = sanitizeEventLabel(props.file);
               title = `File edited: ${file}`;
               source = file;
             } else if (evt.type === "command.executed") {
-              const name = (props.name as string) ?? "unknown";
+              const name = sanitizeEventLabel(props.name);
               title = `Command executed: ${name}`;
               source = name;
             } else if (evt.type === "session.created") {
