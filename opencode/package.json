@@ -8,12 +8,17 @@
     "url": "git+https://github.com/oritwoen/obsxa.git"
   },
   "files": [
-    "index.mjs"
+    "index.mjs",
+    "index.d.mts"
   ],
   "type": "module",
   "main": "./index.mjs",
+  "types": "./index.d.mts",
   "exports": {
-    ".": "./index.mjs"
+    ".": {
+      "types": "./index.d.mts",
+      "default": "./index.mjs"
+    }
   },
   "dependencies": {
     "obsxa": "0.0.2"
