@@ -1,0 +1,21 @@
+{
+  "name": "obsxa-opencode",
+  "version": "0.0.2",
+  "description": "OpenCode plugin wrapper package for obsxa",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oritwoen/obsxa.git"
+  },
+  "files": [
+    "index.mjs"
+  ],
+  "type": "module",
+  "main": "./index.mjs",
+  "exports": {
+    ".": "./index.mjs"
+  },
+  "dependencies": {
+    "obsxa": "0.0.2"
+  }
+}
