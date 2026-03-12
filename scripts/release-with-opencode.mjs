@@ -45,6 +45,6 @@ const version = readRootVersion();
 syncOpencodePackageVersion(version);
 
 run("git", ["add", "."]);
-run("git", ["commit", "-m", `v${version}`]);
-run("git", ["tag", `v${version}`]);
+run("git", ["commit", "-m", `chore(release): v${version}`]);
+run("git", ["tag", "-a", `v${version}`, "-m", `v${version}`]);
 run("git", ["push", "--follow-tags"]);
