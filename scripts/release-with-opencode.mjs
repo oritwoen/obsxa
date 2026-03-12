@@ -7,8 +7,8 @@ const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const packageJsonPath = resolve(rootDir, "package.json");
 const opencodePackageJsonPath = resolve(rootDir, "opencode/package.json");
 
-function runChangelogen(args) {
-  execFileSync("changelogen", args, {
+function run(cmd, args) {
+  execFileSync(cmd, args, {
     cwd: rootDir,
     stdio: "inherit",
   });
@@ -39,9 +39,12 @@ function syncOpencodePackageVersion(version) {
   );
 }
 
-runChangelogen(["--bump"]);
+run("changelogen", ["--bump"]);
 
 const version = readRootVersion();
 syncOpencodePackageVersion(version);
 
-runChangelogen(["--release", "-r", version, "--push"]);
+run("git", ["add", "."]);
+run("git", ["commit", "-m", `v${version}`]);
+run("git", ["tag", `v${version}`]);
+run("git", ["push", "--follow-tags"]);
