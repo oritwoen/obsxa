@@ -9,6 +9,7 @@ export interface ObsxaPluginOptions {
   projectName?: string;
   maxInjectedObservations?: number;
   maxInjectedChars?: number;
+  toolLoader?: () => Promise<typeof import("@opencode-ai/plugin/tool")>;
 }
 
 type PluginInput = {
@@ -177,15 +178,19 @@ async function findByHash(
   return found.id;
 }
 
-const AGENT_INSTRUCTION =
+const AGENT_TOOL_INSTRUCTION =
   "When you notice patterns, anomalies, correlations, or interesting measurements during your work, record them using the obsxa tool (operation=add) for future reference. Types: pattern, anomaly, measurement, correlation, artifact.";
+
+const AGENT_FALLBACK_INSTRUCTION =
+  "When you notice patterns, anomalies, correlations, or interesting measurements during your work, record them for future reference. Types: pattern, anomaly, measurement, correlation, artifact.";
 
 async function createObsxaTool(
   obsxa: ObsxaInstance,
   defaultProjectId: string,
+  toolLoader?: () => Promise<typeof import("@opencode-ai/plugin/tool")>,
 ): Promise<Record<string, unknown> | undefined> {
   try {
-    const pluginToolModule = await import("@opencode-ai/plugin/tool");
+    const pluginToolModule = await (toolLoader ?? (() => import("@opencode-ai/plugin/tool")))();
     const pluginTool = pluginToolModule.tool;
     const schema = pluginTool.schema;
 
@@ -253,7 +258,8 @@ async function createObsxaTool(
           case "get": {
             if (typeof args.id !== "number")
               throw new Error("obsxa tool: 'id' is required for get");
-            result = await obsxa.observation.get(args.id);
+            const observation = await obsxa.observation.get(args.id);
+            result = observation && observation.projectId === projectId ? observation : null;
             break;
           }
           case "list": {
@@ -417,7 +423,7 @@ export function createObsxaPlugin(options?: ObsxaPluginOptions): Plugin {
       const latestMessageBufferBySession = new Map<string, string>();
       const hashCache = new Map<string, number>();
       const sessionMessageObs = new Map<string, number>();
-      const obsxaTool = await createObsxaTool(obsxa, projectId);
+      const obsxaTool = await createObsxaTool(obsxa, projectId, options?.toolLoader);
 
       return {
         tool: obsxaTool
@@ -667,9 +673,8 @@ export function createObsxaPlugin(options?: ObsxaPluginOptions): Plugin {
             const maxObs = options?.maxInjectedObservations ?? 10;
             const maxChars = options?.maxInjectedChars ?? 2000;
 
-            // Always push agent instruction
             sysOutput.system.push(
-              `<obsxa-instruction>\n${AGENT_INSTRUCTION}\n</obsxa-instruction>`,
+              `<obsxa-instruction>\n${obsxaTool ? AGENT_TOOL_INSTRUCTION : AGENT_FALLBACK_INSTRUCTION}\n</obsxa-instruction>`,
             );
 
             const query =

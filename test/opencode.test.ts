@@ -10,6 +10,9 @@ type ChatHook = NonNullable<Hooks["chat.message"]>;
 type ToolHook = NonNullable<Hooks["tool.execute.after"]>;
 type EventHook = NonNullable<Hooks["event"]>;
 type SystemHook = NonNullable<Hooks["experimental.chat.system.transform"]>;
+type ObsxaTool = {
+  execute: (args: Record<string, unknown>) => Promise<string>;
+};
 
 let trackedHooks: Hooks[] = [];
 
@@ -30,12 +33,15 @@ function chatInput(
   sessionID: string,
   messageID?: string,
   agent?: string,
-  model?: unknown,
+  model?: Parameters<ChatHook>[0]["model"],
 ): Parameters<ChatHook>[0] {
   return { sessionID, messageID, agent, model };
 }
 
-function chatOutput(message: unknown, parts: unknown[]): Parameters<ChatHook>[1] {
+function chatOutput(
+  message: unknown,
+  parts: Parameters<ChatHook>[1]["parts"],
+): Parameters<ChatHook>[1] {
   return { message, parts };
 }
 
@@ -56,12 +62,26 @@ function toolOutput(title: string, output: string, metadata: unknown): Parameter
   return { title, output, metadata };
 }
 
-function eventInput(type: string, properties: unknown): Parameters<EventHook>[0] {
+function eventInput(type: string, properties: Record<string, unknown>): Parameters<EventHook>[0] {
   return { event: { type, properties } };
 }
 
 function systemInput(sessionID?: string): Parameters<SystemHook>[0] {
   return { sessionID, model: null };
+}
+
+function getObsxaTool(hooks: Hooks): ObsxaTool {
+  const tool = hooks.tool?.obsxa;
+  if (!tool || typeof tool !== "object") {
+    throw new Error("obsxa tool unavailable");
+  }
+
+  const candidate = tool as { execute?: unknown };
+  if (typeof candidate.execute !== "function") {
+    throw new Error("obsxa tool execute unavailable");
+  }
+
+  return { execute: candidate.execute as ObsxaTool["execute"] };
 }
 
 describe("createObsxaPlugin", () => {
@@ -489,6 +509,38 @@ describe("tool.execute.after hook", () => {
   });
 });
 
+describe("obsxa tool", () => {
+  let dbDir: string;
+  let dbPath: string;
+
+  beforeEach(() => {
+    dbDir = mkdtempSync(join(tmpdir(), "obsxa-plugin-obsxa-tool-"));
+    dbPath = join(dbDir, "test.db");
+  });
+
+  afterEach(async () => {
+    await cleanupTrackedHooks();
+    rmSync(dbDir, { recursive: true, force: true });
+  });
+
+  it("get returns null for observations from another project", async () => {
+    await getHooks(dbPath, "project-a");
+    const hooksB = await getHooks(dbPath, "project-b");
+
+    const obsxa = await createObsxa({ db: dbPath });
+    const observation = await obsxa.observation.add({
+      projectId: "project-a",
+      title: "Project A only observation",
+      source: "test",
+    });
+    await obsxa.close();
+
+    const result = await getObsxaTool(hooksB).execute({ operation: "get", id: observation.id });
+
+    expect(JSON.parse(result)).toBeNull();
+  });
+});
+
 describe("event hook", () => {
   let dbDir: string;
   let dbPath: string;
@@ -585,7 +637,40 @@ describe("system.transform hook", () => {
     const output = { system: [] as string[] };
     await hooks["experimental.chat.system.transform"]!(systemInput(), output);
     expect(output.system.length).toBeGreaterThanOrEqual(1);
-    expect(output.system.some((s) => s.includes("obsxa tool"))).toBe(true);
+    expect(output.system.join(" ")).toContain("record them");
+  });
+
+  it("mentions obsxa tool only when tool is registered", async () => {
+    const hooks = await getHooks(dbPath);
+    const output = { system: [] as string[] };
+    await hooks["experimental.chat.system.transform"]!(systemInput(), output);
+
+    const hasObsxaTool =
+      hooks.tool !== undefined && Object.prototype.hasOwnProperty.call(hooks.tool, "obsxa");
+    expect(output.system.some((s) => s.includes("obsxa tool"))).toBe(hasObsxaTool);
+  });
+
+  it("falls back to generic instruction when tool registration fails", async () => {
+    const plugin = createObsxaPlugin({
+      db: dbPath,
+      toolLoader: async () => {
+        throw new Error("missing plugin tool");
+      },
+    });
+    const hooks = await plugin({
+      project: { id: "test-project" },
+      directory: "/tmp",
+      worktree: "/tmp",
+    });
+    trackedHooks.push(hooks);
+
+    const output = { system: [] as string[] };
+    await hooks["experimental.chat.system.transform"]!(systemInput(), output);
+
+    const joined = output.system.join(" ");
+    expect(hooks.tool).toBeUndefined();
+    expect(joined).toContain("record them for future reference");
+    expect(joined).not.toContain("obsxa tool");
   });
 
   it("instruction mentions observation types", async () => {
@@ -602,7 +687,7 @@ describe("system.transform hook", () => {
     const hooks = await getHooks(dbPath);
     const output = { system: [] as string[] };
     await hooks["experimental.chat.system.transform"]!(systemInput(), output);
-    const instructionEntry = output.system.find((s) => s.includes("obsxa tool"))!;
+    const instructionEntry = output.system.find((s) => s.includes("<obsxa-instruction>"))!;
     expect(instructionEntry.length).toBeLessThan(500);
   });
 
@@ -717,7 +802,7 @@ describe("system.transform hook", () => {
     await expect(
       hooks["experimental.chat.system.transform"]!(systemInput(), output),
     ).resolves.toBeUndefined();
-    expect(output.system.some((s) => s.includes("obsxa tool"))).toBe(true);
+    expect(output.system.some((s) => s.includes("<obsxa-instruction>"))).toBe(true);
   });
 
   it("does NOT throw when FTS search fails (simulated by empty query)", async () => {
@@ -806,7 +891,7 @@ describe("full lifecycle integration", () => {
 
     const injected = output.system.join(" ");
     expect(output.system.length).toBeGreaterThan(0);
-    expect(output.system.some((s) => s.includes("obsxa tool"))).toBe(true);
+    expect(output.system.some((s) => s.includes("<obsxa-instruction>"))).toBe(true);
     expect(
       injected.includes("Bitcoin") || injected.includes("key patterns") || injected.includes("RNG"),
     ).toBe(true);
