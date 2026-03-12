@@ -25,13 +25,13 @@ importers:
         version: 0.44.7(@libsql/client@0.17.0)(@opentelemetry/api@1.9.0)(@types/better-sqlite3@7.6.13)(better-sqlite3@11.10.0)
     devDependencies:
       '@opencode-ai/plugin':
-        specifier: latest
+        specifier: 1.2.24
         version: 1.2.24
       '@types/node':
         specifier: ^25.3.0
         version: 25.4.0
       '@typescript/native-preview':
-        specifier: latest
+        specifier: 7.0.0-dev.20260310.1
         version: 7.0.0-dev.20260310.1
       ai:
         specifier: ^6.0.116

@@ -55,9 +55,9 @@
     "drizzle-orm": "^0.44.0"
   },
   "devDependencies": {
-    "@opencode-ai/plugin": "latest",
+    "@opencode-ai/plugin": "1.2.24",
     "@types/node": "^25.3.0",
-    "@typescript/native-preview": "latest",
+    "@typescript/native-preview": "7.0.0-dev.20260310.1",
     "ai": "^6.0.116",
     "changelogen": "^0.6.2",
     "drizzle-kit": "^0.31.0",
