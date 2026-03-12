@@ -44,7 +44,11 @@ export function createSearchStore(client: Client) {
   function isRecoverableFtsQueryError(error: unknown, query: string): boolean {
     const message = error instanceof Error ? error.message : String(error);
 
-    if (/((fts5:\s*(syntax|parse) error)|(malformed match expression)|(unterminated string))/i.test(message)) {
+    if (
+      /((fts5:\s*(syntax|parse) error)|(malformed match expression)|(unterminated string))/i.test(
+        message,
+      )
+    ) {
       return true;
     }
 

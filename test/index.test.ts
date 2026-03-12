@@ -224,7 +224,9 @@ describe("obsxa", () => {
       throw new Error("no such column: project_id");
     });
 
-    const store = createSearchStore({ execute } as unknown as Parameters<typeof createSearchStore>[0]);
+    const store = createSearchStore({ execute } as unknown as Parameters<
+      typeof createSearchStore
+    >[0]);
 
     await expect(store.search("Quantum", "p1")).rejects.toThrow(/no such column/i);
     expect(execute).toHaveBeenCalledTimes(1);
