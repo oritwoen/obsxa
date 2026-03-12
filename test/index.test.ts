@@ -237,7 +237,9 @@ describe("obsxa", () => {
       throw new Error("no such column: rank");
     });
 
-    const store = createSearchStore({ execute } as unknown as Parameters<typeof createSearchStore>[0]);
+    const store = createSearchStore({ execute } as unknown as Parameters<
+      typeof createSearchStore
+    >[0]);
 
     await expect(store.search("scan:1", "p1")).rejects.toThrow(/no such column/i);
     expect(execute).toHaveBeenCalledTimes(1);
@@ -249,7 +251,9 @@ describe("obsxa", () => {
       .mockRejectedValueOnce(new Error("no such column: scan"))
       .mockResolvedValueOnce({ rows: [] });
 
-    const store = createSearchStore({ execute } as unknown as Parameters<typeof createSearchStore>[0]);
+    const store = createSearchStore({ execute } as unknown as Parameters<
+      typeof createSearchStore
+    >[0]);
 
     await expect(store.search("scan:1", "p1")).resolves.toEqual([]);
     expect(execute).toHaveBeenCalledTimes(2);
