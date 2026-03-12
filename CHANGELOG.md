@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### 🏡 Chore
+
+- **release:** Simplify release flow to one script and sync version for wrapper `opencode` package
+- **release:** Publish wrapper package from `opencode/` in release workflow
+
 ### ⚠️ Notes
 
 - **db path:** `createObsxa()` now defaults to an XDG-compliant data path (`~/.local/share/obsxa/obsxa.db` on Linux) instead of `./obsxa.db`. Pass `db: "./obsxa.db"` explicitly to keep legacy location.
