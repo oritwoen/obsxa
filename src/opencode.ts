@@ -178,7 +178,122 @@ async function findByHash(
 }
 
 const AGENT_INSTRUCTION =
-  "When you notice patterns, anomalies, correlations, or interesting measurements during your work, record them using the observation tool for future reference. Types: pattern, anomaly, measurement, correlation, artifact.";
+  "When you notice patterns, anomalies, correlations, or interesting measurements during your work, record them using the obsxa tool (operation=add) for future reference. Types: pattern, anomaly, measurement, correlation, artifact.";
+
+async function createObsxaTool(
+  obsxa: ObsxaInstance,
+  defaultProjectId: string,
+): Promise<Record<string, unknown> | undefined> {
+  try {
+    const pluginToolModule = await import("@opencode-ai/plugin/tool");
+    const pluginTool = pluginToolModule.tool;
+    const schema = pluginTool.schema;
+
+    return pluginTool({
+      description:
+        "Manage obsxa observations: add/get/list/search/stats. Defaults to current OpenCode project when projectId is omitted.",
+      args: {
+        operation: schema.enum(["add", "get", "list", "search", "stats"]),
+        projectId: schema.string().optional(),
+        id: schema.number().optional(),
+        title: schema.string().optional(),
+        description: schema.string().optional(),
+        type: schema
+          .enum(["pattern", "anomaly", "measurement", "correlation", "artifact"])
+          .optional(),
+        source: schema.string().optional(),
+        sourceType: schema
+          .enum(["experiment", "manual", "scan", "computation", "external"])
+          .optional(),
+        confidence: schema.number().min(0).max(100).optional(),
+        query: schema.string().optional(),
+        status: schema.enum(["active", "promoted", "dismissed", "archived"]).optional(),
+        limit: schema.number().optional(),
+      },
+      async execute(args) {
+        const operation = String(args.operation ?? "");
+        const projectId =
+          typeof args.projectId === "string" && args.projectId.length > 0
+            ? args.projectId
+            : defaultProjectId;
+
+        let result: unknown;
+        switch (operation) {
+          case "add": {
+            const title = typeof args.title === "string" ? args.title : "";
+            const source = typeof args.source === "string" ? args.source : "opencode";
+            if (!title) throw new Error("obsxa tool: 'title' is required for add");
+            result = await obsxa.observation.add({
+              projectId,
+              title,
+              description: typeof args.description === "string" ? args.description : undefined,
+              type:
+                typeof args.type === "string"
+                  ? (args.type as
+                      | "pattern"
+                      | "anomaly"
+                      | "measurement"
+                      | "correlation"
+                      | "artifact")
+                  : undefined,
+              source,
+              sourceType:
+                typeof args.sourceType === "string"
+                  ? (args.sourceType as
+                      | "experiment"
+                      | "manual"
+                      | "scan"
+                      | "computation"
+                      | "external")
+                  : undefined,
+              confidence: typeof args.confidence === "number" ? args.confidence : undefined,
+            });
+            break;
+          }
+          case "get": {
+            if (typeof args.id !== "number")
+              throw new Error("obsxa tool: 'id' is required for get");
+            result = await obsxa.observation.get(args.id);
+            break;
+          }
+          case "list": {
+            result = await obsxa.observation.list(projectId, {
+              status:
+                typeof args.status === "string"
+                  ? (args.status as "active" | "promoted" | "dismissed" | "archived")
+                  : undefined,
+            });
+            break;
+          }
+          case "search": {
+            if (typeof args.query !== "string" || args.query.length === 0) {
+              throw new Error("obsxa tool: 'query' is required for search");
+            }
+            result = await obsxa.search.search(
+              args.query,
+              projectId,
+              typeof args.limit === "number" ? args.limit : undefined,
+            );
+            break;
+          }
+          case "stats": {
+            result = await obsxa.analysis.stats(projectId);
+            break;
+          }
+          default:
+            throw new Error(
+              "obsxa tool: unsupported operation; expected one of add/get/list/search/stats",
+            );
+        }
+
+        return JSON.stringify(result, null, 2);
+      },
+    });
+  } catch (error) {
+    logHookError("tool.init", error);
+    return undefined;
+  }
+}
 
 function formatObservations(
   results: Array<{
@@ -302,8 +417,14 @@ export function createObsxaPlugin(options?: ObsxaPluginOptions): Plugin {
       const latestMessageBufferBySession = new Map<string, string>();
       const hashCache = new Map<string, number>();
       const sessionMessageObs = new Map<string, number>();
+      const obsxaTool = await createObsxaTool(obsxa, projectId);
 
       return {
+        tool: obsxaTool
+          ? {
+              obsxa: obsxaTool,
+            }
+          : undefined,
         destroy: async () => {
           if (closed) return;
           closed = true;

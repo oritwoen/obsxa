@@ -585,7 +585,7 @@ describe("system.transform hook", () => {
     const output = { system: [] as string[] };
     await hooks["experimental.chat.system.transform"]!(systemInput(), output);
     expect(output.system.length).toBeGreaterThanOrEqual(1);
-    expect(output.system.some((s) => s.includes("observation tool"))).toBe(true);
+    expect(output.system.some((s) => s.includes("obsxa tool"))).toBe(true);
   });
 
   it("instruction mentions observation types", async () => {
@@ -602,7 +602,7 @@ describe("system.transform hook", () => {
     const hooks = await getHooks(dbPath);
     const output = { system: [] as string[] };
     await hooks["experimental.chat.system.transform"]!(systemInput(), output);
-    const instructionEntry = output.system.find((s) => s.includes("observation tool"))!;
+    const instructionEntry = output.system.find((s) => s.includes("obsxa tool"))!;
     expect(instructionEntry.length).toBeLessThan(500);
   });
 
@@ -717,7 +717,7 @@ describe("system.transform hook", () => {
     await expect(
       hooks["experimental.chat.system.transform"]!(systemInput(), output),
     ).resolves.toBeUndefined();
-    expect(output.system.some((s) => s.includes("observation tool"))).toBe(true);
+    expect(output.system.some((s) => s.includes("obsxa tool"))).toBe(true);
   });
 
   it("does NOT throw when FTS search fails (simulated by empty query)", async () => {
@@ -806,7 +806,7 @@ describe("full lifecycle integration", () => {
 
     const injected = output.system.join(" ");
     expect(output.system.length).toBeGreaterThan(0);
-    expect(output.system.some((s) => s.includes("observation tool"))).toBe(true);
+    expect(output.system.some((s) => s.includes("obsxa tool"))).toBe(true);
     expect(
       injected.includes("Bitcoin") || injected.includes("key patterns") || injected.includes("RNG"),
     ).toBe(true);
