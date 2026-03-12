@@ -1,0 +1,35 @@
+{
+  "name": "obsxa-claude-code",
+  "version": "0.0.3",
+  "description": "Claude Code plugin wrapper package for obsxa (MCP server + hooks)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oritwoen/obsxa.git"
+  },
+  "bin": {
+    "obsxa-claude-code": "./index.mjs",
+    "obsxa-hooks": "./hooks.mjs",
+    "obsxa-mcp": "./index.mjs"
+  },
+  "files": [
+    "index.mjs",
+    "hooks.mjs",
+    "index.d.mts"
+  ],
+  "type": "module",
+  "main": "./index.mjs",
+  "types": "./index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./index.d.mts",
+      "default": "./index.mjs"
+    },
+    "./hooks": {
+      "default": "./hooks.mjs"
+    }
+  },
+  "dependencies": {
+    "obsxa": "0.0.3"
+  }
+}

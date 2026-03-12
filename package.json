@@ -11,7 +11,9 @@
     "url": "git+https://github.com/oritwoen/obsxa.git"
   },
   "bin": {
-    "obsxa": "./dist/cli.mjs"
+    "obsxa": "./dist/cli.mjs",
+    "obsxa-hooks": "./dist/claude-code-hooks.mjs",
+    "obsxa-mcp": "./dist/claude-code.mjs"
   },
   "files": [
     "dist",
@@ -33,6 +35,14 @@
     "./opencode": {
       "types": "./dist/opencode.d.mts",
       "import": "./dist/opencode.mjs"
+    },
+    "./claude-code": {
+      "types": "./dist/claude-code.d.mts",
+      "import": "./dist/claude-code.mjs"
+    },
+    "./claude-code-hooks": {
+      "types": "./dist/claude-code-hooks.d.mts",
+      "import": "./dist/claude-code-hooks.mjs"
     }
   },
   "scripts": {
@@ -55,6 +65,7 @@
     "drizzle-orm": "^0.44.0"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1",
     "@opencode-ai/plugin": "1.2.24",
     "@types/node": "^25.3.0",
     "@typescript/native-preview": "7.0.0-dev.20260310.1",
@@ -69,11 +80,15 @@
     "zod": "^4.3.6"
   },
   "peerDependencies": {
+    "@modelcontextprotocol/sdk": ">=1.0.0",
     "@opencode-ai/plugin": "*",
     "ai": ">=6.0.0",
     "zod": ">=4.0.0"
   },
   "peerDependenciesMeta": {
+    "@modelcontextprotocol/sdk": {
+      "optional": true
+    },
     "@opencode-ai/plugin": {
       "optional": true
     },
