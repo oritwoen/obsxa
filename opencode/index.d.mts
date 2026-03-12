@@ -1,4 +1,3 @@
-import { createObsxaPlugin } from "obsxa/opencode";
-export { createObsxaPlugin };
-declare const _default: ReturnType<typeof createObsxaPlugin>;
+export { createObsxaPlugin } from "../src/opencode.ts";
+declare const _default: ReturnType<typeof import("../src/opencode.ts").createObsxaPlugin>;
 export default _default;
