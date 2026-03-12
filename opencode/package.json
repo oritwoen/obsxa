@@ -1,6 +1,6 @@
 {
   "name": "obsxa-opencode",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "OpenCode plugin wrapper package for obsxa",
   "license": "MIT",
   "repository": {
@@ -21,6 +21,6 @@
     }
   },
   "dependencies": {
-    "obsxa": "0.0.2"
+    "obsxa": "0.0.3"
   }
 }
