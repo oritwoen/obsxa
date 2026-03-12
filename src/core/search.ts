@@ -41,11 +41,14 @@ function rowToObservation(row: Record<string, unknown>): Observation {
 }
 
 export function createSearchStore(client: Client) {
-  function isRecoverableFtsQueryError(error: unknown): boolean {
+  function isRecoverableFtsQueryError(error: unknown, query: string): boolean {
     const message = error instanceof Error ? error.message : String(error);
-    return /((fts5:\s*(syntax|parse) error)|(malformed match expression)|(unterminated string)|(no such column:))/i.test(
-      message,
-    );
+
+    if (/((fts5:\s*(syntax|parse) error)|(malformed match expression)|(unterminated string))/i.test(message)) {
+      return true;
+    }
+
+    return query.includes(":") && /no such column:/i.test(message);
   }
 
   return {
@@ -71,7 +74,7 @@ export function createSearchStore(client: Client) {
         const rows = result.rows as Record<string, unknown>[];
         return rows.map((row, index) => ({ observation: rowToObservation(row), rank: index + 1 }));
       } catch (error) {
-        if (!isRecoverableFtsQueryError(error)) {
+        if (!isRecoverableFtsQueryError(error, query)) {
           throw error;
         }
 

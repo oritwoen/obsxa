@@ -2,8 +2,9 @@ import { mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createClient } from "@libsql/client/node";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { backupDatabase, restoreDatabase } from "../src/backup.ts";
+import { createSearchStore } from "../src/core/search.ts";
 import { createObsxa, type ObsxaInstance } from "../src/index.ts";
 
 async function setSchemaVersion(dbPath: string, version: number): Promise<void> {
@@ -216,6 +217,17 @@ describe("obsxa", () => {
     }
 
     await expect(obsxa.search.search("Quantum", "p1")).rejects.toThrow(/observations_fts/i);
+  });
+
+  it("does not fallback on generic no such column when query has no colon", async () => {
+    const execute = vi.fn(async () => {
+      throw new Error("no such column: project_id");
+    });
+
+    const store = createSearchStore({ execute } as unknown as Parameters<typeof createSearchStore>[0]);
+
+    await expect(store.search("Quantum", "p1")).rejects.toThrow(/no such column/i);
+    expect(execute).toHaveBeenCalledTimes(1);
   });
 
   it("computes analysis stats, frequent, isolated, unpromoted", async () => {
