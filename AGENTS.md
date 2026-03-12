@@ -1,89 +1,99 @@
-# PROJECT KNOWLEDGE BASE
+# AGENTS.md
 
-**Generated:** 2026-03-11T22:28:42+01:00
-**Commit:** aaea389
-**Branch:** main
+Practical playbook for coding agents working in `obsxa`.
 
-## OVERVIEW
+## Quick Commands
 
-obsxa is an ESM-only TypeScript library + CLI for structured observation tracking (project, observation, relation, cluster, dedup, analysis).
-Core data logic lives in `src/core`, CLI orchestration in `src/commands`, and AI SDK tools in `src/ai.ts`.
+All commands are verified from `package.json` and CI workflows.
 
-## STRUCTURE
-
-```
-obsxa/
-|- src/
-|  |- cli.ts           # citty CLI entrypoint
-|  |- index.ts         # createObsxa API + migration/bootstrap path
-|  |- ai.ts            # AI SDK tools (zod discriminated unions)
-|  |- commands/        # CLI subcommand handlers
-|  `- core/            # stores, schema, dedup/analysis/search logic
-|- test/               # integration + parser tests
-|- drizzle/            # SQL migrations + drizzle metadata
-`- .github/workflows/  # test/release/autofix automation
+```bash
+pnpm install
+pnpm dev
+pnpm build
+pnpm lint
+pnpm lint:fix
+pnpm typecheck
+pnpm test
+pnpm test:run
+pnpm generate
 ```
 
-## WHERE TO LOOK
+Single-test examples (verified):
 
-| Task                     | Location                       | Notes                                                  |
-| ------------------------ | ------------------------------ | ------------------------------------------------------ |
-| CLI routing              | `src/cli.ts`                   | Dynamic imports per command module                     |
-| Runtime/bootstrap        | `src/index.ts`                 | Meta table, schema versioning, migration, FTS triggers |
-| DB schema                | `src/core/db.ts`               | Drizzle sqlite table declarations                      |
-| Observation lifecycle    | `src/core/observation.ts`      | Add/update/promote/archive/dismiss flow                |
-| Dedup + merge            | `src/core/dedup.ts`            | Similarity scoring + merge transaction                 |
-| AI tool contracts        | `src/ai.ts`                    | Multi-operation tool schemas                           |
-| CLI arg validation       | `src/commands/observation.ts`  | Parsing, percent range checks, import/export           |
-| End-to-end behavior      | `test/index.test.ts`           | Full lifecycle + migration safety                      |
-| Real-world scenario test | `test/usgs-earthquake.test.ts` | Large fixture-driven integration test                  |
+```bash
+pnpm test:run test/observation-parse.test.ts
+pnpm test:run test/backup-command.test.ts
+```
 
-## CODE MAP
+## Codebase Map
 
-| Symbol             | Type     | Location            | Refs   | Role                                      |
-| ------------------ | -------- | ------------------- | ------ | ----------------------------------------- |
-| `createObsxa`      | Function | `src/index.ts`      | High   | Main API constructor + bootstrap pipeline |
-| `createDedupStore` | Function | `src/core/dedup.ts` | High   | Duplicate scan/review/merge engine        |
-| `main`             | Constant | `src/cli.ts`        | Medium | CLI command graph root                    |
-| `observationTool`  | Constant | `src/ai.ts`         | Medium | AI SDK observation operations             |
+- `src/cli.ts`: CLI entrypoint and subcommand routing via dynamic imports.
+- `src/index.ts`: `createObsxa` bootstrap (meta table, schema version check, migrations, FTS setup, store composition).
+- `src/core/*`: domain/data layer (`create*Store` factories for project/observation/relation/cluster/dedup/analysis/search).
+- `src/commands/*`: citty command handlers; thin wrappers around stores with argument coercion and output formatting.
+- `src/ai.ts`: AI SDK tools (`tool(...)` + zod discriminated unions around `operation`).
+- `drizzle/*`: migration artifacts and drizzle metadata. Use as generated source of truth for schema evolution.
+- `test/*`: mostly integration tests with temp SQLite isolation; parser/CLI validation tests are also present.
+- `.github/workflows/test.yml`: CI gate order is lint -> typecheck -> build -> test:run.
 
-## CONVENTIONS
+Subdirectory playbooks already exist and should be treated as local overrides:
 
-- Runtime is Node >= 22, package manager is pnpm, build tool is obuild.
-- `src/commands` modules follow citty `defineCommand` style with `_db.ts` helpers.
-- Tests are in `test/` and favor temp SQLite DB isolation instead of mocks.
-- Release path is tag-driven CI + `pnpm release` (`test:run && build && changelogen`).
+- `src/core/AGENTS.md`
+- `src/commands/AGENTS.md`
+- `test/AGENTS.md`
 
-## ANTI-PATTERNS (THIS PROJECT)
+## Code Conventions
 
-- Do not introduce CommonJS; repo is ESM-only (`package.json`, `AGENTS.md`).
-- Do not use `as any`, `@ts-ignore`, or `@ts-expect-error` (`AGENTS.md`).
-- Do not bypass Drizzle migration flow for schema changes (`AGENTS.md`, `drizzle.config.ts`).
-- Do not remove `--json`/`--toon` output parity from CLI commands (`AGENTS.md`, command files).
-- Do not treat `drizzle/meta` and `dist/` as hand-edited source of truth.
+- ESM-only TypeScript (`package.json` has `"type": "module"`). Do not introduce CommonJS.
+- Keep imports explicit and extension-aware (`./file.ts` style). Use `import type` for type-only imports.
+- Match existing naming: `create*Store` factory pattern in `src/core`, domain-oriented command modules in `src/commands`.
+- CLI pattern: validate early, emit `consola.error(...)`, then `process.exit(1)` for invalid user input.
+- Keep `--json` and `--toon` output parity for command paths that return structured data.
+- Prefer explicit thrown errors in core domain logic (`throw new Error(...)`) over silent failure.
+- Keep percent-like fields in `0..100` and dedup threshold logic in `0..1` domain.
+- Never use `as any`, `@ts-ignore`, or `@ts-expect-error`.
+- Schema changes must go through Drizzle migrations (`pnpm generate`), not ad-hoc SQL edits in runtime code.
 
-## UNIQUE STYLES
+## Execution Workflow
 
-- Store factories are split by domain (`create*Store`) and composed in `createObsxa`.
-- Dedup scoring combines exact fingerprints + token/trigram similarity and persists review events.
-- CLI command files are thin wrappers around store methods with explicit input coercion.
+1. Explore first: find similar implementation in target module and nearest tests.
+2. Plan the smallest diff that fits existing boundaries (`src/core` vs `src/commands` vs `src/ai.ts`).
+3. Edit surgically; keep behavior and output shape compatibility.
+4. Verify with diagnostics and commands relevant to changed files.
+5. Re-check docs/tests when command surface or schema behavior changes.
 
-## COMMANDS
+Default verification sequence after non-trivial edits:
 
 ```bash
 pnpm lint
 pnpm typecheck
 pnpm test:run
 pnpm build
-pnpm generate
-pnpm release
 ```
 
-## NOTES
+When touching one area, start with focused tests first, then full suite.
 
-- `release.yml` publishes on `v*` tags with `--no-git-checks`; local validation still expected.
-- `autofix.yml` can push lint-fix commits on PRs and main.
-- `obsxa.db*` files may exist locally; treat as runtime artifacts.
+## Memory Workflow
+
+- Before answering questions about past decisions or prior sessions, run memory search first.
+- Reuse prior habits only when they still match current code; repository state wins on conflicts.
+- Log durable learnings in the right memory bucket (not in random scratch notes).
+- If writing dated memory notes, use the event date, not the write date.
+
+## Safety and Git Hygiene
+
+- Do not run destructive git operations (`reset --hard`, checkout file reverts) unless explicitly requested.
+- Do not commit or push unless explicitly requested.
+- Do not leak secrets or local credentials in output, logs, docs, or snapshots.
+- Treat `dist/` and `drizzle/meta/` as generated artifacts; do not hand-edit them.
+- Local runtime DB files (`obsxa.db*`) may exist; do not assume they are disposable without confirmation.
+
+## Communication Style
+
+- Keep responses concise, direct, and technical.
+- Explain why when making non-obvious changes or tradeoffs.
+- Prefer concrete commands and file paths over abstract guidance.
+- Avoid template filler; report uncertainty explicitly and include a way to verify.
 
 <!-- skilld -->
 
