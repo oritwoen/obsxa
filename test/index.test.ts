@@ -187,7 +187,7 @@ describe("obsxa", () => {
     await obsxa.project.add({ id: "p1", name: "Obs Project" });
     await obsxa.observation.add({
       projectId: "p1",
-      title: "Quantum anomaly",
+      title: "Quantum anomaly scan:1",
       description: "Euler's signal",
       source: "scan:1",
       tags: ["quantum"],
@@ -196,6 +196,8 @@ describe("obsxa", () => {
     expect(fts).toHaveLength(1);
     const fallback = await obsxa.search.search("'", "p1");
     expect(fallback.length).toBeGreaterThan(0);
+    const colonFallback = await obsxa.search.search("scan:1", "p1");
+    expect(colonFallback.length).toBeGreaterThan(0);
   });
 
   it("does not swallow non-recoverable fts errors", async () => {

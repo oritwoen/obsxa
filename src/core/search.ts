@@ -43,7 +43,9 @@ function rowToObservation(row: Record<string, unknown>): Observation {
 export function createSearchStore(client: Client) {
   function isRecoverableFtsQueryError(error: unknown): boolean {
     const message = error instanceof Error ? error.message : String(error);
-    return /(fts5:|malformed match expression|unterminated string)/i.test(message);
+    return /((fts5:\s*(syntax|parse) error)|(malformed match expression)|(unterminated string)|(no such column:))/i.test(
+      message,
+    );
   }
 
   return {
