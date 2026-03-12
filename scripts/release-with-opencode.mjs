@@ -44,5 +44,4 @@ runChangelogen(["--bump"]);
 const version = readRootVersion();
 syncOpencodePackageVersion(version);
 
-runChangelogen(["--bump", "--dir", "./opencode", "-r", version]);
 runChangelogen(["--release", "-r", version, "--push"]);

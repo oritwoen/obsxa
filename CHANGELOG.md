@@ -6,6 +6,7 @@
 
 - **release:** Simplify release flow to one script and sync version for wrapper `opencode` package
 - **release:** Publish wrapper package from `opencode/` in release workflow
+- **release:** Keep single root changelog/release and sync wrapper package metadata only
 
 ### ⚠️ Notes
 
