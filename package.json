@@ -45,7 +45,7 @@
     "test:run": "vitest --run",
     "generate": "drizzle-kit generate",
     "prepack": "pnpm run build",
-    "release": "pnpm test:run && pnpm build && changelogen --release --push"
+    "release": "pnpm test:run && pnpm build && node ./scripts/release-with-opencode.mjs"
   },
   "dependencies": {
     "@libsql/client": "^0.17.0",
