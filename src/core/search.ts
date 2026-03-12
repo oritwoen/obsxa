@@ -41,6 +41,29 @@ function rowToObservation(row: Record<string, unknown>): Observation {
 }
 
 export function createSearchStore(client: Client) {
+  function isRecoverableFtsQueryError(error: unknown, query: string): boolean {
+    const message = error instanceof Error ? error.message : String(error);
+
+    if (
+      /((fts5:\s*(syntax|parse) error)|(malformed match expression)|(unterminated string))/i.test(
+        message,
+      )
+    ) {
+      return true;
+    }
+
+    const missingColumn = message.match(/no such column:\s*["`]?(\w+)["`]?/i)?.[1]?.toLowerCase();
+    if (!missingColumn) {
+      return false;
+    }
+
+    const referencedColumns = Array.from(query.matchAll(/\b([A-Za-z_][A-Za-z0-9_]*)\s*:/g))
+      .map((match) => match[1]?.toLowerCase())
+      .filter((name): name is string => Boolean(name));
+
+    return referencedColumns.includes(missingColumn);
+  }
+
   return {
     async search(query: string, projectId?: string, limit = 50): Promise<SearchResult[]> {
       try {
@@ -63,7 +86,11 @@ export function createSearchStore(client: Client) {
         const result = await client.execute({ sql, args: params });
         const rows = result.rows as Record<string, unknown>[];
         return rows.map((row, index) => ({ observation: rowToObservation(row), rank: index + 1 }));
-      } catch {
+      } catch (error) {
+        if (!isRecoverableFtsQueryError(error, query)) {
+          throw error;
+        }
+
         let sql = `
           SELECT *
           FROM observations

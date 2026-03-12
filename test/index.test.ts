@@ -2,8 +2,9 @@ import { mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createClient } from "@libsql/client/node";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { backupDatabase, restoreDatabase } from "../src/backup.ts";
+import { createSearchStore } from "../src/core/search.ts";
 import { createObsxa, type ObsxaInstance } from "../src/index.ts";
 
 async function setSchemaVersion(dbPath: string, version: number): Promise<void> {
@@ -187,7 +188,7 @@ describe("obsxa", () => {
     await obsxa.project.add({ id: "p1", name: "Obs Project" });
     await obsxa.observation.add({
       projectId: "p1",
-      title: "Quantum anomaly",
+      title: "Quantum anomaly scan:1",
       description: "Euler's signal",
       source: "scan:1",
       tags: ["quantum"],
@@ -196,6 +197,66 @@ describe("obsxa", () => {
     expect(fts).toHaveLength(1);
     const fallback = await obsxa.search.search("'", "p1");
     expect(fallback.length).toBeGreaterThan(0);
+    const colonFallback = await obsxa.search.search("scan:1", "p1");
+    expect(colonFallback.length).toBeGreaterThan(0);
+  });
+
+  it("does not swallow non-recoverable fts errors", async () => {
+    await obsxa.project.add({ id: "p1", name: "Obs Project" });
+    await obsxa.observation.add({
+      projectId: "p1",
+      title: "Quantum anomaly",
+      source: "scan:1",
+    });
+
+    const client = createClient({ url: `file:${dbPath}` });
+    try {
+      await client.execute("DROP TABLE observations_fts");
+    } finally {
+      client.close();
+    }
+
+    await expect(obsxa.search.search("Quantum", "p1")).rejects.toThrow(/observations_fts/i);
+  });
+
+  it("does not fallback on generic no such column when query has no colon", async () => {
+    const execute = vi.fn(async () => {
+      throw new Error("no such column: project_id");
+    });
+
+    const store = createSearchStore({ execute } as unknown as Parameters<
+      typeof createSearchStore
+    >[0]);
+
+    await expect(store.search("Quantum", "p1")).rejects.toThrow(/no such column/i);
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not fallback when missing column does not match referenced prefix", async () => {
+    const execute = vi.fn(async () => {
+      throw new Error("no such column: rank");
+    });
+
+    const store = createSearchStore({ execute } as unknown as Parameters<
+      typeof createSearchStore
+    >[0]);
+
+    await expect(store.search("scan:1", "p1")).rejects.toThrow(/no such column/i);
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back when missing column matches referenced prefix", async () => {
+    const execute = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("no such column: scan"))
+      .mockResolvedValueOnce({ rows: [] });
+
+    const store = createSearchStore({ execute } as unknown as Parameters<
+      typeof createSearchStore
+    >[0]);
+
+    await expect(store.search("scan:1", "p1")).resolves.toEqual([]);
+    expect(execute).toHaveBeenCalledTimes(2);
   });
 
   it("computes analysis stats, frequent, isolated, unpromoted", async () => {
