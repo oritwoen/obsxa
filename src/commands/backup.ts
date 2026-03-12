@@ -2,6 +2,7 @@ import { defineCommand } from "citty";
 import { consola } from "consola";
 import { dbArgs, output } from "./_db.ts";
 import { backupDatabase, restoreDatabase } from "../backup.ts";
+import { getDefaultDbPath } from "../core/db-path.ts";
 
 export default defineCommand({
   meta: { name: "backup", description: "Backup or restore obsxa SQLite database files" },
@@ -16,7 +17,7 @@ export default defineCommand({
           },
           run({ args }) {
             try {
-              const result = backupDatabase(args.db, args.out);
+              const result = backupDatabase(args.db ?? getDefaultDbPath(), args.out);
               if (args.toon || args.json) return output(result, args.toon);
               consola.success(`Backup created: ${result.basePath}`);
             } catch (err) {
@@ -41,7 +42,7 @@ export default defineCommand({
           },
           run({ args }) {
             try {
-              const result = restoreDatabase(args.db, args.from);
+              const result = restoreDatabase(args.db ?? getDefaultDbPath(), args.from);
               if (args.toon || args.json) return output(result, args.toon);
               consola.success(`Database restored from: ${result.restoredFrom}`);
               if (result.preRestoreBackup) {

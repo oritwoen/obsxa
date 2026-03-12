@@ -130,6 +130,15 @@ export function createObservationStore(db: ObsxaDB) {
       return row ? toObservation(row) : null;
     },
 
+    async getByInputHash(projectId: string, inputHash: string): Promise<Observation | null> {
+      const row = await db
+        .select()
+        .from(observations)
+        .where(and(eq(observations.projectId, projectId), eq(observations.inputHash, inputHash)))
+        .get();
+      return row ? toObservation(row) : null;
+    },
+
     async list(
       projectId: string,
       opts?: {

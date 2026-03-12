@@ -6,6 +6,7 @@ import { drizzle } from "drizzle-orm/libsql/node";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { createAnalysisStore } from "./core/analysis.ts";
 import { createClusterStore } from "./core/cluster.ts";
+import { getDefaultDbPath } from "./core/db-path.ts";
 import { createDedupStore } from "./core/dedup.ts";
 import { createObservationStore } from "./core/observation.ts";
 import { createProjectStore } from "./core/project.ts";
@@ -52,6 +53,9 @@ export type {
   UpdateObservation,
 } from "./types.ts";
 
+export { createObsxaPlugin } from "./opencode.ts";
+export type { ObsxaPluginOptions } from "./opencode.ts";
+
 function findMigrationsFolder(): string {
   const start = dirname(fileURLToPath(import.meta.url));
   let current = start;
@@ -79,7 +83,7 @@ async function ensureMetaTable(client: Client): Promise<void> {
 }
 
 async function getSchemaVersion(client: Client): Promise<number | null> {
-  let result;
+  let result: Awaited<ReturnType<Client["execute"]>>;
   try {
     result = await client.execute({
       sql: "SELECT value FROM obsxa_meta WHERE key = ?",
@@ -146,6 +150,7 @@ const CUSTOM_SQL = [
   "CREATE INDEX IF NOT EXISTS idx_observations_type ON observations(type)",
   "CREATE INDEX IF NOT EXISTS idx_observations_source_type ON observations(source_type)",
   "CREATE INDEX IF NOT EXISTS idx_observations_triage ON observations(triage_score)",
+  "CREATE INDEX IF NOT EXISTS idx_observations_project_input_hash ON observations(project_id, input_hash)",
   "CREATE INDEX IF NOT EXISTS idx_rel_from ON observation_relations(from_observation_id)",
   "CREATE INDEX IF NOT EXISTS idx_rel_to ON observation_relations(to_observation_id)",
   "CREATE INDEX IF NOT EXISTS idx_rel_type ON observation_relations(type)",
@@ -209,17 +214,19 @@ export interface ObsxaInstance {
  * await obsxa.close()
  * ```
  */
-export async function createObsxa(
-  options: ObsxaOptions = { db: "./obsxa.db" },
-): Promise<ObsxaInstance> {
+export async function createObsxa(options: ObsxaOptions = {}): Promise<ObsxaInstance> {
+  const dbPath = options.db ?? getDefaultDbPath();
   const resolved = {
     autoMigrate: options.autoMigrate ?? true,
     autoBackup: options.autoBackup ?? true,
     backupDir: options.backupDir,
   };
 
-  const dbUrl = toLibsqlUrl(options.db);
-  const backupDbPath = toBackupDbPath(options.db);
+  const dbUrl = toLibsqlUrl(dbPath);
+  const backupDbPath = toBackupDbPath(dbPath);
+  if (backupDbPath) {
+    mkdirSync(dirname(backupDbPath), { recursive: true });
+  }
   const client = createClient({ url: dbUrl });
   try {
     try {

@@ -29,6 +29,10 @@
     "./ai": {
       "types": "./dist/ai.d.mts",
       "import": "./dist/ai.mjs"
+    },
+    "./opencode": {
+      "types": "./dist/opencode.d.mts",
+      "import": "./dist/opencode.mjs"
     }
   },
   "scripts": {
@@ -51,8 +55,9 @@
     "drizzle-orm": "^0.44.0"
   },
   "devDependencies": {
+    "@opencode-ai/plugin": "1.2.24",
     "@types/node": "^25.3.0",
-    "@typescript/native-preview": "latest",
+    "@typescript/native-preview": "7.0.0-dev.20260310.1",
     "ai": "^6.0.116",
     "changelogen": "^0.6.2",
     "drizzle-kit": "^0.31.0",
@@ -64,10 +69,14 @@
     "zod": "^4.3.6"
   },
   "peerDependencies": {
+    "@opencode-ai/plugin": "*",
     "ai": ">=6.0.0",
     "zod": ">=4.0.0"
   },
   "peerDependenciesMeta": {
+    "@opencode-ai/plugin": {
+      "optional": true
+    },
     "ai": {
       "optional": true
     },
