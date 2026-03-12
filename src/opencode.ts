@@ -22,7 +22,9 @@ type PluginInput = {
 
 type Hooks = {
   destroy?: () => Promise<void>;
-  event?: (input: { event: { type: string; properties: Record<string, unknown> } }) => Promise<void>;
+  event?: (input: {
+    event: { type: string; properties: Record<string, unknown> };
+  }) => Promise<void>;
   config?: (input: unknown) => Promise<void>;
   tool?: Record<string, unknown>;
   auth?: unknown;
@@ -44,7 +46,11 @@ type Hooks = {
       sessionID: string;
       agent: string;
       model: unknown;
-      provider: { source: "env" | "config" | "custom" | "api"; info: unknown; options: Record<string, unknown> };
+      provider: {
+        source: "env" | "config" | "custom" | "api";
+        info: unknown;
+        options: Record<string, unknown>;
+      };
       message: unknown;
     },
     output: { temperature: number; topP: number; topK: number; options: Record<string, unknown> },
@@ -54,7 +60,11 @@ type Hooks = {
       sessionID: string;
       agent: string;
       model: unknown;
-      provider: { source: "env" | "config" | "custom" | "api"; info: unknown; options: Record<string, unknown> };
+      provider: {
+        source: "env" | "config" | "custom" | "api";
+        info: unknown;
+        options: Record<string, unknown>;
+      };
       message: unknown;
     },
     output: { headers: Record<string, string> },
