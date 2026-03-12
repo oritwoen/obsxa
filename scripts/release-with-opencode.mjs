@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -24,10 +24,12 @@ function readRootVersion() {
 }
 
 function syncOpencodePackageVersion(version) {
+  if (!existsSync(opencodePackageJsonPath)) {
+    throw new Error(`Missing wrapper package definition at ${opencodePackageJsonPath}`);
+  }
+
   const opencodePackageJson = JSON.parse(readFileSync(opencodePackageJsonPath, "utf8"));
   opencodePackageJson.version = version;
-  opencodePackageJson.dependencies ??= {};
-  opencodePackageJson.dependencies.obsxa = version;
   writeFileSync(
     opencodePackageJsonPath,
     `${JSON.stringify(opencodePackageJson, null, 2)}\n`,

@@ -16,6 +16,6 @@
     ".": "./index.mjs"
   },
   "dependencies": {
-    "obsxa": "0.0.2"
+    "obsxa": "*"
   }
 }
