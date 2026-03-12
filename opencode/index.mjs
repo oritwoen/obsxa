@@ -1,2 +1,6 @@
-export { createObsxaPlugin } from "obsxa/opencode";
-export { createObsxaPlugin as default } from "obsxa/opencode";
+import { createObsxaPlugin } from "obsxa/opencode";
+
+const plugin = createObsxaPlugin();
+
+export { createObsxaPlugin };
+export default plugin;
