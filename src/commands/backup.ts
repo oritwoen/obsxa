@@ -1,5 +1,6 @@
 import { defineCommand } from "citty";
 import { consola } from "consola";
+import { dbArgs, output } from "./_db.ts";
 import { backupDatabase, restoreDatabase } from "../backup.ts";
 
 export default defineCommand({
@@ -10,17 +11,13 @@ export default defineCommand({
         defineCommand({
           meta: { name: "create", description: "Create database backup (db, wal, shm)" },
           args: {
-            db: { type: "string", default: "./obsxa.db", description: "Path to SQLite database" },
+            ...dbArgs,
             out: { type: "string", description: "Backup base path (without -wal/-shm suffixes)" },
-            json: { type: "boolean", default: false, description: "Output as JSON" },
           },
           run({ args }) {
             try {
               const result = backupDatabase(args.db, args.out);
-              if (args.json) {
-                process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-                return;
-              }
+              if (args.toon || args.json) return output(result, args.toon);
               consola.success(`Backup created: ${result.basePath}`);
             } catch (err) {
               consola.error(`Backup failed: ${(err as Error).message}`);
@@ -35,25 +32,17 @@ export default defineCommand({
         defineCommand({
           meta: { name: "restore", description: "Restore database from backup base path" },
           args: {
-            db: {
-              type: "string",
-              default: "./obsxa.db",
-              description: "Target SQLite database path",
-            },
+            ...dbArgs,
             from: {
               type: "string",
               required: true,
               description: "Backup base path to restore from",
             },
-            json: { type: "boolean", default: false, description: "Output as JSON" },
           },
           run({ args }) {
             try {
               const result = restoreDatabase(args.db, args.from);
-              if (args.json) {
-                process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-                return;
-              }
+              if (args.toon || args.json) return output(result, args.toon);
               consola.success(`Database restored from: ${result.restoredFrom}`);
               if (result.preRestoreBackup) {
                 consola.info(`Pre-restore safety backup: ${result.preRestoreBackup}`);
