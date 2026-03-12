@@ -52,7 +52,16 @@ export function createSearchStore(client: Client) {
       return true;
     }
 
-    return query.includes(":") && /no such column:/i.test(message);
+    const missingColumn = message.match(/no such column:\s*["`]?(\w+)["`]?/i)?.[1]?.toLowerCase();
+    if (!missingColumn) {
+      return false;
+    }
+
+    const referencedColumns = Array.from(query.matchAll(/\b([A-Za-z_][A-Za-z0-9_]*)\s*:/g))
+      .map((match) => match[1]?.toLowerCase())
+      .filter((name): name is string => Boolean(name));
+
+    return referencedColumns.includes(missingColumn);
   }
 
   return {

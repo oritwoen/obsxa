@@ -232,6 +232,29 @@ describe("obsxa", () => {
     expect(execute).toHaveBeenCalledTimes(1);
   });
 
+  it("does not fallback when missing column does not match referenced prefix", async () => {
+    const execute = vi.fn(async () => {
+      throw new Error("no such column: rank");
+    });
+
+    const store = createSearchStore({ execute } as unknown as Parameters<typeof createSearchStore>[0]);
+
+    await expect(store.search("scan:1", "p1")).rejects.toThrow(/no such column/i);
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back when missing column matches referenced prefix", async () => {
+    const execute = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("no such column: scan"))
+      .mockResolvedValueOnce({ rows: [] });
+
+    const store = createSearchStore({ execute } as unknown as Parameters<typeof createSearchStore>[0]);
+
+    await expect(store.search("scan:1", "p1")).resolves.toEqual([]);
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
   it("computes analysis stats, frequent, isolated, unpromoted", async () => {
     await obsxa.project.add({ id: "p1", name: "Obs Project" });
     const a = await obsxa.observation.add({
